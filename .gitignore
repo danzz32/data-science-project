@@ -10,4 +10,10 @@ wheels/
 .venv
 
 # variáveis de ambiente
-.env
+.env.*
+
+# Kaggle
+data/raw/*.csv
+data/raw/*.zip
+data/raw/*.json
+data/raw/*.txt
