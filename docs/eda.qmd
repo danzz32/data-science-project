@@ -1,0 +1,123 @@
+---
+title: "Análise Exploratória de Dados (EDA) - 911 Calls"
+author: "Danilo Monteiro e Gabriel"
+date: today
+jupyer: python3
+format: 
+  html:
+    toc: true
+    toc-title: "Índice"
+    code-fold: show
+    theme: cosmo
+execute: 
+  warning: false
+  message: false
+  daemon: false
+  cache: false
+---
+
+# **TRATAMENTOS COM O DF AQUI**
+
+Aqui ficam os tratamentos de ETL (análise exploratória, outliers e etc) usando a extensão do Quarto no VS Code, permitindo uma transição fluida entre desenvolvimento e documentação.
+
+## Descrição do Dataset
+Este conjunto de dados representa as chamadas policiais de emergência e não emergência para o 911. Trata-se de um arquivo CSV simples com cerca de **932K** de registros.
+
+Link do dataset: [911 - Service](https://www.kaggle.com/datasets/ahmadrafiee/911-calls-for-service-metadata-1-million-record)
+
+## Setup
+
+Carregamento das bibliotecas necessárias para a análise exploratória.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+import kagglehub
+from kagglehub import KaggleDatasetAdapter
+import os
+import shutil
+
+# Configurações visuais do Seaborn
+sns.set_theme(style="whitegrid")
+
+# 1. Configuração de Caminhos
+# Como este arquivo está em docs/, o parent é a raiz do projeto (meu_pipeline_dados)
+PROJECT_ROOT = Path.cwd().parent 
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+RAW_FILE_PATH = RAW_DIR / "911.csv"
+
+# Garante que a pasta de destino exista
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+if RAW_FILE_PATH.exists():
+    print(f"✅ Arquivo já existe em {RAW_FILE_PATH}. Carregando...")
+    df = pd.read_csv(RAW_FILE_PATH, sep=None, engine='python', encoding='utf-8')
+else:
+    print("⏳ Iniciando download e organização dos arquivos...")
+    try:
+        # 2. Download para o cache do sistema
+        download_path = kagglehub.dataset_download("ahmadrafiee/911-calls-for-service-metadata-1-million-record")
+        
+        # 3. Localiza o arquivo CSV no cache
+        files = [f for f in os.listdir(download_path) if f.endswith('.csv')]
+        if not files:
+            raise FileNotFoundError("Nenhum CSV encontrado no download.")
+        
+        temp_csv_path = Path(download_path) / files[0]
+
+        # 4. Move o arquivo do cache para a sua pasta data/raw/
+        shutil.copy(temp_csv_path, RAW_FILE_PATH)
+        print(f"📂 Arquivo movido com sucesso para: {RAW_FILE_PATH}")
+
+        # 5. Leitura com detecção automática de separador
+        df = pd.read_csv(RAW_FILE_PATH, sep=None, engine='python', on_bad_lines='warn')
+        
+        print(f"🎯 Dados carregados com sucesso! Total de linhas: {len(df)}")
+
+    except Exception as e:
+        print(f"❌ Erro: {e}")
+
+if 'df' in locals():
+    display(df.head())
+```
+
+## Infos Básicas
+Visualizando o escopo geral dos dados ingeridos na camada raw.
+
+```{python}
+display(df)
+```
+
+Estatísticas descritivas básicas das variáveis numéricas.
+```{python}
+display(df.describe())
+```
+
+## Verificação de Outliers
+Identificação visual de distribuições anômalas.
+
+```{python}
+# plt.figure(figsize=(10, 5))
+# sns.boxplot(x=df['callDateTime'])
+# plt.title('Identificação Visual de Outliers (Boxplot) - callDateTime')
+# plt.show()
+```
+
+Analisando a dispersão simultânea de todas as variáveis numéricas capturadas no dataframe.
+```{python}
+# plt.figure(figsize=(12, 6))
+# sns.boxplot(data=df.select_dtypes(include=['float64', 'int64']))
+# plt.title('Boxplot Múltiplo de Variáveis Numéricas')
+# plt.xticks(rotation=45) # Rotaciona os nomes para melhor leitura
+# plt.show()
+```
+
+## Métricas e Visualizações
+(Espaço reservado para futuras modelagens geométricas e dashboards integrados)
+
+```{python}
+# Insira os novos gráficos aqui
+```
