@@ -45,41 +45,34 @@ sns.set_theme(style="whitegrid")
 
 # 1. Configuração de Caminhos
 # Como este arquivo está em docs/, o parent é a raiz do projeto (meu_pipeline_dados)
+from pathlib import Path
+import pandas as pd
+
+# Configuração de caminhos
 PROJECT_ROOT = Path.cwd().parent 
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 RAW_FILE_PATH = RAW_DIR / "911.csv"
 
-# Garante que a pasta de destino exista
-RAW_DIR.mkdir(parents=True, exist_ok=True)
-
+# Verifica se o arquivo existe e tenta ler
 if RAW_FILE_PATH.exists():
-    print(f"✅ Arquivo já existe em {RAW_FILE_PATH}. Carregando...")
-    df = pd.read_csv(RAW_FILE_PATH, sep=None, engine='python', encoding='utf-8')
-else:
-    print("⏳ Iniciando download e organização dos arquivos...")
+    print(f"✅ Arquivo encontrado em: {RAW_FILE_PATH}")
     try:
-        # 2. Download para o cache do sistema
-        download_path = kagglehub.dataset_download("ahmadrafiee/911-calls-for-service-metadata-1-million-record")
-        
-        # 3. Localiza o arquivo CSV no cache
-        files = [f for f in os.listdir(download_path) if f.endswith('.csv')]
-        if not files:
-            raise FileNotFoundError("Nenhum CSV encontrado no download.")
-        
-        temp_csv_path = Path(download_path) / files[0]
-
-        # 4. Move o arquivo do cache para a sua pasta data/raw/
-        shutil.copy(temp_csv_path, RAW_FILE_PATH)
-        print(f"📂 Arquivo movido com sucesso para: {RAW_FILE_PATH}")
-
-        # 5. Leitura com detecção automática de separador
-        df = pd.read_csv(RAW_FILE_PATH, sep=None, engine='python', on_bad_lines='warn')
-        
+        # Leitura com detecção automática de separador e tratamento de erros
+        df = pd.read_csv(
+            RAW_FILE_PATH, 
+            sep=None, 
+            engine='python', 
+            encoding='utf-8', 
+            on_bad_lines='warn'
+        )
         print(f"🎯 Dados carregados com sucesso! Total de linhas: {len(df)}")
-
     except Exception as e:
-        print(f"❌ Erro: {e}")
+        print(f"❌ Erro ao ler o arquivo: {e}")
+else:
+    print(f"⚠️ Arquivo NÃO encontrado em: {RAW_FILE_PATH}")
+    print("Certifique-se de que o arquivo '911.csv' está na pasta correta.")
 
+# Exibe o preview se o dataframe foi criado
 if 'df' in locals():
     display(df.head())
 ```
