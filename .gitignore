@@ -22,4 +22,4 @@ data/raw/*.txt
 !data/raw/.gitkeep
 
 docs/*
-!docs/.qmd
+!docs/*.qmd
