@@ -1,6 +1,6 @@
 ---
 title: "Análise Exploratória de Dados (EDA) - 911 Calls"
-author: "Danilo Monteiro e Gabriel"
+author: "Danilo Monteiro, Gabriel Camargo e Fábio Batalha"
 date: today
 jupyer: python3
 format: 
@@ -69,7 +69,7 @@ if RAW_FILE_PATH.exists():
     except Exception as e:
         print(f"❌ Erro ao ler o arquivo: {e}")
 else:
-    print(f"⚠️ Arquivo NÃO encontrado em: {RAW_FILE_PATH}")
+    print(f"⚠️ Arquivo NÃO encontrado em: {RAW_FILE_PATH}, execute o código de ingestão para baixar o dataset.")
     print("Certifique-se de que o arquivo '911.csv' está na pasta correta.")
 
 # Exibe o preview se o dataframe foi criado
@@ -93,24 +93,30 @@ display(df.describe())
 Identificação visual de distribuições anômalas.
 
 ```{python}
-# plt.figure(figsize=(10, 5))
-# sns.boxplot(x=df['callDateTime'])
-# plt.title('Identificação Visual de Outliers (Boxplot) - callDateTime')
-# plt.show()
+# Criando uma amostra de 10k linhas para visualização rápida
+df_sample = df.sample(n=10000, random_state=42)
+
+plt.figure(figsize=(10, 5))
+sns.boxplot(x=df_sample['callDateTime'])
+plt.title('Identificação Visual de Outliers (Boxplot) - callDateTime (Amostra 10k)')
+plt.show()
 ```
 
 Analisando a dispersão simultânea de todas as variáveis numéricas capturadas no dataframe.
 ```{python}
-# plt.figure(figsize=(12, 6))
-# sns.boxplot(data=df.select_dtypes(include=['float64', 'int64']))
-# plt.title('Boxplot Múltiplo de Variáveis Numéricas')
-# plt.xticks(rotation=45) # Rotaciona os nomes para melhor leitura
-# plt.show()
+df_sample = df.sample(n=10000, random_state=42)
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=df_sample.select_dtypes(include=['float64', 'int64']))
+
+plt.title('Boxplot Múltiplo de Variáveis Numéricas (Amostra 10k)')
+plt.xticks(rotation=45)
+plt.show()
 ```
 
 ## Métricas e Visualizações
 (Espaço reservado para futuras modelagens geométricas e dashboards integrados)
 
 ```{python}
-# Insira os novos gráficos aqui
+# Inserção de novos gráficos aqui
 ```
