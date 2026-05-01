@@ -11,12 +11,19 @@ def main():
 
     PROJECT_ROOT = Path(__file__).resolve().parent.parent
     RAW_DIR = PROJECT_ROOT / "data" / "raw"
-    datestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") #variável para coleta de data e hora
-    RAW_FILE_PATH = RAW_DIR / f"911_{datestamp}.csv" #novo PATh já com o acrescimo das iformações de data e hora
+    datestamp = datetime.now().strftime("%Y-%m-%d") #variável para coleta de data
+    RAW_FILE_PATH = RAW_DIR / f"911_{datestamp}.csv" #novo PATH já com informação de data
     #RAW_FILE_PATH = RAW_DIR / "911.csv" (código substituído)
 
     # Garante que a pasta raw exista
     RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+    # --- ALTERAÇÃO: CHECK DE IDEMPOTÊNCIA ---
+    if RAW_FILE_PATH.exists():
+        print(f"⚠️  Atenção: O arquivo '{RAW_FILE_PATH.name}' já existe na pasta de destino.")
+        print("⏭️  Pulando a ingestão para evitar duplicidade e consumo desnecessário de API.")
+        return # Finaliza a execução da função main() aqui
+    # ----------------------------------------
 
     print("⏳ Iniciando o processo de ingestão da API do Kaggle...")
 
