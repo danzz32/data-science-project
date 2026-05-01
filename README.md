@@ -21,8 +21,9 @@ curl -LsSf [https://astral.sh/uv/install.sh](https://astral.sh/uv/install.sh) | 
 
 ```bash
 powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/install.ps1) | iex"
-Para outras formas de instalação, consulte a documentação oficial do uv.
 ```
+
+Para outras formas de instalação, consulte a documentação oficial do uv.
 
 🚀 Como executar
 
