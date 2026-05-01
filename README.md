@@ -15,11 +15,14 @@ Para gerenciar as dependências e o ambiente virtual deste projeto de forma perf
 
 ```bash
 curl -LsSf [https://astral.sh/uv/install.sh](https://astral.sh/uv/install.sh) | sh
+```
 
 **No Windows/PowerShell:**
 
+```bash
 powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/install.ps1) | iex"
 Para outras formas de instalação, consulte a documentação oficial do uv.
+```
 
 🚀 Como executar
 
