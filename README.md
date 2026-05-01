@@ -23,18 +23,19 @@ curl -LsSf [https://astral.sh/uv/install.sh](https://astral.sh/uv/install.sh) | 
 powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/install.ps1) | iex"
 ```
 
-Para outras formas de instalação, consulte a documentação oficial do uv.
+**Para outras formas de instalação, consulte a documentação oficial do uv.**
 
-🚀 Como executar
+## 🚀 Como executar
 
 Para baixar do repositório: git clone https://github.com/danzz32/data-science-project.git
 Para sincronizar as dependências do projeto: uv sync
 Para executar o script dentro do ambiente virtual isolado: uv run python src/ingest.py
 
-🔐 Variáveis de Ambiente
+## 🔐 Variáveis de Ambiente
 
 
-📈 Resultado Esperado
+## 📈 Resultado Esperado
+
 Ao final da execução deste projeto, espera-se a geração de:
 1.	Mapas de Calor Interativos: Visualizações geográficas que identifiquem os trechos de rodovias com maior densidade de acidentes (hotspots).
 2.	Análise de Periculosidade: Identificação estatística dos fatores que mais contribuem para a gravidade das ocorrências (ex: relação entre condições climáticas e óbitos).
