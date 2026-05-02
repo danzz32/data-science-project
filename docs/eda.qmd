@@ -67,9 +67,9 @@ if RAW_FILE_PATH.exists():
         # Leitura com detecção automática de separador e tratamento de erros
         df = pd.read_csv(
             RAW_FILE_PATH, 
-            sep=None, 
+            sep=';', 
             engine='python', 
-            encoding='utf-8', 
+            encoding='latin-1', 
             on_bad_lines='warn'
         )
         print(f"🎯 Dados carregados com sucesso! Total de linhas: {len(df)}")
@@ -77,7 +77,7 @@ if RAW_FILE_PATH.exists():
         print(f"❌ Erro ao ler o arquivo: {e}")
 else:
     print(f"⚠️ Arquivo NÃO encontrado em: {RAW_FILE_PATH}, execute o código de ingestão para baixar o dataset.")
-    print("Certifique-se de que o arquivo '911.csv' está na pasta correta.")
+    print("Certifique-se de que o arquivo 'prf_191_*.csv' está na pasta correta.")
 
 # Exibe o preview se o dataframe foi criado
 if 'df' in locals():
@@ -101,24 +101,24 @@ Identificação visual de distribuições anômalas.
 
 ```{python}
 # Criando uma amostra de 10k linhas para visualização rápida
-df_sample = df.sample(n=10000, random_state=42)
+# df_sample = df.sample(n=10000, random_state=42)
 
-plt.figure(figsize=(10, 5))
-sns.boxplot(x=df_sample['callDateTime'])
-plt.title('Identificação Visual de Outliers (Boxplot) - callDateTime (Amostra 10k)')
-plt.show()
+# plt.figure(figsize=(10, 5))
+# sns.boxplot(x=df_sample['callDateTime'])
+# plt.title('Identificação Visual de Outliers (Boxplot) - callDateTime (Amostra 10k)')
+# plt.show()
 ```
 
 Analisando a dispersão simultânea de todas as variáveis numéricas capturadas no dataframe.
 ```{python}
-df_sample = df.sample(n=10000, random_state=42)
+# df_sample = df.sample(n=10000, random_state=42)
 
-plt.figure(figsize=(12, 6))
-sns.boxplot(data=df_sample.select_dtypes(include=['float64', 'int64']))
+# plt.figure(figsize=(12, 6))
+# sns.boxplot(data=df_sample.select_dtypes(include=['float64', 'int64']))
 
-plt.title('Boxplot Múltiplo de Variáveis Numéricas (Amostra 10k)')
-plt.xticks(rotation=45)
-plt.show()
+# plt.title('Boxplot Múltiplo de Variáveis Numéricas (Amostra 10k)')
+# plt.xticks(rotation=45)
+# plt.show()
 ```
 
 ## Métricas e Visualizações
