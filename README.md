@@ -10,7 +10,7 @@ O projeto utiliza a base de dados abertos da Polícia Rodoviária Federal (PRF),
 ## 🛠 Pré-requisitos
 
 <div align="justify">
-Para gerenciar as dependências e o ambiente virtual deste projeto de forma performática, utilizamos o **uv**, um instalador e gerenciador de pacotes Python extremamente rápido escrito em Rust.
+Para gerenciar as dependências e o ambiente virtual deste projeto de forma performática, utilizamos o **uv** , um instalador e gerenciador de pacotes Python extremamente rápido escrito em Rust.
 <div>
 
 ### Instalação do uv
