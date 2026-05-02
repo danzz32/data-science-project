@@ -52,9 +52,11 @@ Para configurar o seu ambiente, faça uma cópia do arquivo de exemplo executand
 ```bash
 cp .env.example .env
 ```
+<div align="justify">
 Em seguida, abra o arquivo .env recém-criado na raiz do projeto e preencha as informações (se necessário).
 Variáveis utilizadas no projeto:
 Nesta etapa inicial de ingestão (download dos dados públicos da PRF), nenhuma variável de ambiente ou chave de API foi necessária. O script funcionará perfeitamente apenas com as configurações padrão.
+</div>
 
 ## 📈 Resultado Esperado
 
