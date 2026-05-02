@@ -31,12 +31,18 @@ powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/insta
 
 ## 🚀 Como executar
 
-1. Para baixar do repositório: git clone (https://github.com/danzz32/data-science-project.git)
-
-2. Para sincronizar as dependências do projeto: uv sync
-
-3. Para executar o script dentro do ambiente virtual isolado: uv run python src/ingest.py
-
+1. Para baixar do repositório:
+```bash
+   git clone https://github.com/fsbatalha-acad/data-science-project_v2.git
+```
+4. Para sincronizar as dependências do projeto:
+```bash
+   uv sync
+```
+7. Para executar o script dentro do ambiente virtual isolado:
+```bash
+   uv run python src/ingest.py
+```
 ## 🔐 Variáveis de Ambiente
 
 
