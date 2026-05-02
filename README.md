@@ -44,7 +44,17 @@ powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/insta
    uv run python src/ingest.py
 ```
 ## 🔐 Variáveis de Ambiente
+<div align="justify">
+O gerenciamento de configurações e credenciais locais é feito através de variáveis de ambiente. Este projeto inclui um arquivo de modelo para facilitar essa configuração.
+Para configurar o seu ambiente, faça uma cópia do arquivo de exemplo executando o comando abaixo no seu terminal:
+</div>
 
+```bash
+cp .env.example .env
+```
+Em seguida, abra o arquivo .env recém-criado na raiz do projeto e preencha as informações (se necessário).
+Variáveis utilizadas no projeto:
+Nesta etapa inicial de ingestão (download dos dados públicos da PRF), nenhuma variável de ambiente ou chave de API foi necessária. O script funcionará perfeitamente apenas com as configurações padrão.
 
 ## 📈 Resultado Esperado
 
