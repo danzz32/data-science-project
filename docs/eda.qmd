@@ -1,5 +1,5 @@
 ---
-title: "Análise Exploratória de Dados (EDA) - 911 Calls"
+title: "Análise Exploratória de Dados (EDA) - PRF_191"
 author: "Danilo Monteiro, Gabriel Camargo e Fábio Batalha"
 date: today
 jupyer: python3
@@ -23,7 +23,7 @@ Aqui ficam os tratamentos de ETL (análise exploratória, outliers e etc) usando
 ## Descrição do Dataset
 Este conjunto de dados representa as chamadas policiais de emergência e não emergência para o 911. Trata-se de um arquivo CSV simples com cerca de **932K** de registros.
 
-Link do dataset: [911 - Service](https://www.kaggle.com/datasets/ahmadrafiee/911-calls-for-service-metadata-1-million-record)
+Link do dataset: [PRF_191 - Service](https://drive.google.com/file/d/1-PJGRbfSe7PVjU37A3wTCls_NRXyVGRD/view?usp=sharing/download)
 
 ## Setup
 
@@ -44,14 +44,21 @@ import shutil
 sns.set_theme(style="whitegrid")
 
 # 1. Configuração de Caminhos
-# Como este arquivo está em docs/, o parent é a raiz do projeto (meu_pipeline_dados)
 from pathlib import Path
 import pandas as pd
 
-# Configuração de caminhos
 PROJECT_ROOT = Path.cwd().parent 
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
-RAW_FILE_PATH = RAW_DIR / "911.csv"
+
+# Busca todos os arquivos que seguem o padrão do ingest
+arquivos_encontrados = list(RAW_DIR.glob("prf_191_*.csv"))
+
+if arquivos_encontrados:
+    # Ordena pelos arquivos mais recentes e pega o primeiro
+    RAW_FILE_PATH = max(arquivos_encontrados, key=lambda p: p.stat().st_mtime)
+    print(f"📂 Arquivo mais recente detectado: {RAW_FILE_PATH.name}")
+else:
+    RAW_FILE_PATH = RAW_DIR / "prf_191_NAO_ENCONTRADO.csv"
 
 # Verifica se o arquivo existe e tenta ler
 if RAW_FILE_PATH.exists():
