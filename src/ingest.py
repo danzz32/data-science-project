@@ -2,6 +2,7 @@ import os
 import shutil
 import zipfile
 import gdown
+import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -10,73 +11,104 @@ def main():
     # 1. Carrega as variáveis de ambiente do arquivo .env
     load_dotenv()
 
-    # 2. Configuração de caminhos
+    # 2. Configurações de Pastas e Data
     PROJECT_ROOT = Path(__file__).resolve().parent.parent
     RAW_DIR = PROJECT_ROOT / "data" / "raw"
+    TEMP_DIR = RAW_DIR / "temp_extraction" 
     
-    # Geramos o sufixo de data
+    # Gerando a data da ingestão
     datestamp = datetime.now().strftime("%Y-%m-%d")
-    RAW_FILE_PATH = RAW_DIR / f"prf_191_{datestamp}.csv"
+    FINAL_FILE = RAW_DIR / f"prf_acidentes_consolidado_{datestamp}.csv"
 
-    # Garante que a pasta raw exista
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 3. Check de Idempotência
-    if RAW_FILE_PATH.exists():
-        print(f"⚠️  Atenção: O arquivo '{RAW_FILE_PATH.name}' já existe.")
-        print("⏭️  Pulando a ingestão para evitar duplicidade e retrabalho.")
-        return 
+    # 3. Check de Idempotência (Validador de existência)
+    if FINAL_FILE.exists():
+        print(f"⚠️  Atenção: O arquivo '{FINAL_FILE.name}' já existe.")
+        print("⏭️  Pulando a ingestão para evitar duplicidade e retrabalho de múltiplos anos.")
+        return
 
-    # 4. Configuração do link de download (Drive ID extraído da URL)
-    FILE_ID = "1-PJGRbfSe7PVjU37A3wTCls_NRXyVGRD"
-    DRIVE_URL = f"https://drive.google.com/uc?id={FILE_ID}"
-    
-    temp_download_path = RAW_DIR / "temp_download.zip"
+    # Só cria a pasta temporária se o processo for realmente rodar
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(f"⏳ Iniciando o download dos Dados Abertos da PRF via Google Drive...")
+    # 4. Mapeamento de Anos e IDs 
+    DATA_SOURCES = {
+        "2025": "1-PJGRbfSe7PVjU37A3wTCls_NRXyVGRD",
+        "2024": "14qBOhrE1gioVtuXgxkCJ9kCA8YtUGXKA",  
+        "2023": "1-caam_dahYOf2eorq4mez04Om6DD5d_3", 
+        "2022": "1wskEgRC3ame7rncSDQ7qWhKsoKw1lohY",
+        "2021": "1Gk3U6cMOZIevsDZHLi6J503xoCRS_lnI",
+    }
 
-    try:
-        # 5. Download do arquivo burlando a tela de aviso do Drive
-        gdown.download(DRIVE_URL, str(temp_download_path), quiet=False)
+    all_dataframes = []
+    first_header = None
 
-        if not temp_download_path.exists():
-            raise FileNotFoundError("Falha no download. O arquivo não foi salvo no disco.")
+    print(f"🚀 Iniciando processamento de {len(DATA_SOURCES)} anos...")
 
-        print("📦 Download finalizado. Processando arquivo...")
+    # 5. Loop de Download e Validação
+    for ano, file_id in DATA_SOURCES.items():
+        # Trava de segurança para IDs não configurados
+        if file_id.startswith("ID_AQUI"):
+            print(f"⚠️  Pulando ano {ano}: ID não configurado.")
+            continue
 
-        # 6. Verifica se é um arquivo ZIP e extrai o CSV
-        if zipfile.is_zipfile(temp_download_path):
-            print("🗜️  Arquivo ZIP detectado. Extraindo...")
-            with zipfile.ZipFile(temp_download_path, 'r') as zip_ref:
-                # Pega o nome do primeiro arquivo dentro do ZIP (o CSV da PRF)
-                csv_filename = zip_ref.namelist()[0]
-                extracted_path = zip_ref.extract(csv_filename, path=RAW_DIR)
-                
-                # Move e renomeia para o padrão do nosso projeto
-                shutil.move(extracted_path, RAW_FILE_PATH)
-        else:
-            # Caso no futuro o governo mude e entregue o CSV direto, o código não quebra
-            shutil.move(temp_download_path, RAW_FILE_PATH)
-
-        # Limpa o arquivo .zip temporário
-        if temp_download_path.exists():
-            temp_download_path.unlink()
-
-        print(f"✅ Ingestão concluída com sucesso! Arquivo salvo em: {RAW_FILE_PATH}")
-
-        # 7. Contagem de Registros
-        print("📊 Calculando o volume de dados ingeridos...")
+        print(f"\n--- Processando Ano: {ano} ---")
         
-        # Lendo com latin-1 por padrão dos arquivos do governo brasileiro
-        with open(RAW_FILE_PATH, 'r', encoding='latin-1', errors='ignore') as f:
-            total_registros = sum(1 for linha in f) - 1 # O '-1' desconta o cabeçalho
-            total_registros = max(0, total_registros)
+        # Monta a URL e o caminho do arquivo temporário
+        drive_url = f"https://drive.google.com/uc?id={file_id}"
+        zip_path = TEMP_DIR / f"download_{ano}.zip"
         
-        numero_formatado = f"{total_registros:,}".replace(',', '.')
-        print(f"📈 Total de registros coletados: {numero_formatado} linhas.")
+        try:
+            # Baixa o arquivo silenciosamente
+            gdown.download(drive_url, str(zip_path), quiet=True)
 
-    except Exception as e:
-        print(f"❌ Erro crítico durante a ingestão: {e}")
+            # Extração do ZIP
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                csv_name = zip_ref.namelist()[0]
+                zip_ref.extract(csv_name, path=TEMP_DIR)
+                csv_path = TEMP_DIR / csv_name
+
+            # Leitura e Validação com Pandas
+            df = pd.read_csv(csv_path, sep=';', encoding='latin-1', low_memory=False)
+            current_header = list(df.columns)
+
+            if first_header is None:
+                first_header = current_header
+                all_dataframes.append(df)
+                print(f"✅ {ano}: Arquivo base carregado ({len(df)} linhas).")
+            else:
+                if current_header == first_header:
+                    all_dataframes.append(df)
+                    print(f"✅ {ano}: Cabeçalho validado e dados acumulados ({len(df)} linhas).")
+                else:
+                    print(f"❌ {ano}: ERRO! Cabeçalho incompatível. Este ano será ignorado.")
+
+        except Exception as e:
+            print(f"❌ Erro ao processar {ano}: {e}")
+
+    # 6. Consolidação Final (Indentação ajustada: fora do loop for)
+    if all_dataframes:
+        print("\n--- Consolidando arquivos ---")
+        # Junta todos os DataFrames empilhando-os
+        df_final = pd.concat(all_dataframes, ignore_index=True)
+        
+        # Salva o arquivo final com a data no nome
+        df_final.to_csv(FINAL_FILE, sep=';', encoding='latin-1', index=False)
+        
+        print(f"✨ Sucesso! Arquivo consolidado salvo em: {FINAL_FILE}")
+        print(f"📊 Total final de registros: {len(df_final):,}".replace(',', '.'))
+        
+        # Cálculo do tamanho do arquivo em MB
+        tamanho_bytes = FINAL_FILE.stat().st_size
+        tamanho_mb = tamanho_bytes / (1024 * 1024)
+        print(f"💾 Tamanho final do arquivo: {tamanho_mb:.2f} MB")
+        
+    else:
+        print("\n❌ Nenhum dado foi processado com sucesso.")
+
+    # 7. Limpeza da pasta temporária
+    if TEMP_DIR.exists():
+        shutil.rmtree(TEMP_DIR)
 
 if __name__ == "__main__":
     main()
