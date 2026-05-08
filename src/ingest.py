@@ -18,7 +18,7 @@ def main():
     
     # Gerando a data da ingestão
     datestamp = datetime.now().strftime("%Y-%m-%d")
-    FINAL_FILE = RAW_DIR / f"prf_acidentes_consolidado_{datestamp}.csv"
+    FINAL_FILE = RAW_DIR / f"prf_191_{datestamp}.csv"
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
