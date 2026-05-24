@@ -1,0 +1,160 @@
+---
+title: "EDA de Qualidade de Dados - PRF 191 (Sprint 2)"
+author: "Danilo Monteiro, Fábio Batalha e Gabriel Camargo"
+date: 2026-05-23
+jupyter: python3
+format:
+  html:
+    toc: true
+    toc-title: "Índice"
+    code-fold: show
+    theme: cosmo
+execute:
+  warning: false
+  message: false
+---
+
+# Introdução
+Este notebook tem como objetivo documentar o perfil de qualidade dos dados brutos de acidentes da PRF (camada `raw/`). O diagnóstico guiará as decisões de tratamento que serão implementadas no script `transform.py`. A análise está dividida nas quatro dimensões de Batini et al. (2009): Completude, Consistência, Acurácia e Temporalidade.
+
+## Setup e Carregamento
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+
+# Configurações visuais
+sns.set_theme(style="whitegrid")
+
+# Configuração de Caminhos para a pasta raw/
+PROJECT_ROOT = Path.cwd().parent
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+
+# Busca o ficheiro bruto mais recente
+arquivos_encontrados = list(RAW_DIR.glob("prf_191_*.csv"))
+
+if arquivos_encontrados:
+    RAW_FILE_PATH = max(arquivos_encontrados, key=lambda p: p.stat().st_mtime)
+    print(f"📂 A ler ficheiro: {RAW_FILE_PATH.name}")
+
+    # Leitura com os padrões do governo (latin-1, separador ponto e vírgula)
+    df = pd.read_csv(RAW_FILE_PATH, sep=';', encoding='latin-1', low_memory=False)
+    print(f"🎯 Total de registos iniciais: {len(df)}")
+    print(f"🎯 Total de colunas: {len(df.columns)}")
+    
+    print("\nAs colunas da base são:")
+    print(df.columns.tolist())
+else:
+    print("⚠️ Nenhum ficheiro encontrado na pasta raw/.")
+```
+
+---
+# 1. Dimensão: Completude
+**Objetivo:** Identificar campos com valores ausentes (nulos), a proporção de falta e se existe algum padrão.
+---
+
+```{python}
+# Calcula a percentagem de nulos por coluna
+nulos = df.isnull().sum()
+nulos_pct = (nulos / len(df)) * 100
+
+# Filtra apenas colunas que possuem nulos e ordena
+df_nulos = pd.DataFrame({
+    'Total_Nulos': nulos,
+    'Percentagem (%)': nulos_pct.round(2)
+})
+
+df_nulos['Percentagem (%)'] = df_nulos['Percentagem (%)'].map('{:.2f}%'.format)
+
+display(df_nulos)
+```
+
+📝 Conclusão da Equipe (Completude):
+---
+# 2. Dimensão: Consistência
+**Objetivo:** Verificar contradições internas na base de dados.
+
+```{python}
+# Verificação de consistência - PRF
+colunas_esperadas = ['mortos', 'feridos_leves', 'feridos_graves', 'tipo_veiculo']
+if all(c in df.columns for c in colunas_esperadas):
+    # Valores numéricos não podem ser negativos
+    negativos = df[(df['mortos'] < 0) | (df['feridos_leves'] < 0) | (df['feridos_graves'] < 0)]
+    print(f"Registos com contagem negativa de vítimas: {len(negativos)}")
+
+    # Inconsistência lógica: Acidente com vítimas, mas sem veículos envolvidos
+    sem_veiculo = df[(df['tipo_veiculo'] == 0) & ((df['mortos'] > 0) | (df['feridos_leves'] > 0))]
+    print(f"Registos com vítimas mas zero veículos envolvidos: {len(sem_veiculo)}")
+else:
+    print("Colunas de vítimas/veículos não encontradas com estes nomes.")
+  ```
+
+📝 Conclusão da Equipe (Consistência):
+
+---
+# 3. Dimensão: Acurácia
+**Objetivo:** Verificar se os valores existentes fazem sentido, analisar a tipagem correta e detetar outliers.
+---
+
+```{python}
+# 3.1 Verificação de Tipos Incorretos
+print("Tipos de dados atuais (algumas colunas):")
+display(df.dtypes.head(10))
+
+# 3.2 Validação de Domínio (Exemplo com UF)
+if 'uf' in df.columns:
+    ufs_invalidas = df[~df['uf'].isin(['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+                                       'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN',
+                                       'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'])]
+    print(f"\nRegistos com UF fora do domínio (inválidas): {len(ufs_invalidas)}")
+
+# 3.3 Outliers (Exemplo visual em colunas numéricas)
+# Seleciona apenas algumas numéricas para evitar poluição visual
+num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+
+if num_cols:
+    plt.figure(figsize=(12, 5))
+    sns.boxplot(data=df[num_cols[:5]]) # Plota as 5 primeiras colunas numéricas
+    plt.title('Distribuição Numérica - Busca por Outliers')
+    plt.xticks(rotation=45)
+    plt.show()
+  ```
+
+📝 Conclusão da Equipe (Acurácia):
+
+---
+# 4. Dimensão: Temporalidade
+**Objetivo:** Avaliar a correção das datas e a existência de lacunas no tempo ou datas futuras.
+---
+
+```{python}
+if 'data_inversa' in df.columns:
+    # Tenta converter para datetime para validar
+    df['data_parsed'] = pd.to_datetime(df['data_inversa'], errors='coerce', dayfirst=True)
+
+    datas_invalidas = df['data_parsed'].isnull().sum()
+    print(f"Datas com formato inválido/incompreensível: {datas_invalidas}")
+
+    if datas_invalidas < len(df):
+        print(f"Data mais antiga: {df['data_parsed'].min()}")
+        print(f"Data mais recente: {df['data_parsed'].max()}")
+
+        # Tem dados no futuro?
+        futuro = df[df['data_parsed'] > pd.Timestamp.now()]
+        print(f"Registos com data no futuro: {len(futuro)}")
+
+        # Histograma para ver a distribuição ao longo do tempo
+        plt.figure(figsize=(10, 4))
+        df['data_parsed'].dt.to_period('M').value_counts().sort_index().plot(kind='bar')
+        plt.title('Volume de Acidentes por Mês')
+        plt.xlabel('Ano-Mês')
+        plt.ylabel('Qtd Registos')
+        plt.show()
+else:
+    print("Coluna de data não encontrada.")
+  ```
+
+  📝 Conclusão da Equipe (Temporalidade):
