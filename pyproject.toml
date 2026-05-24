@@ -12,6 +12,7 @@ dependencies = [
     "jupyter>=1.1.1",
     "kagglehub>=1.0.0",
     "matplotlib>=3.10.8",
+    "numpy>=2.4.4",
     "pandas>=3.0.2",
     "pandera>=0.31.0",
     "parquet>=1.3.1",
