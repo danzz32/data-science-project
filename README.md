@@ -39,9 +39,10 @@ powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/insta
 ```bash
    uv sync
 ```
-7. Para executar o script dentro do ambiente virtual isolado:
+7. Para executar os scripts dentro do ambiente virtual isolado:
 ```bash
-   uv run python src/ingest.py
+   uv run src/ingest.py
+   uv run src/transform.py
 ```
 ## 🔐 Variáveis de Ambiente
 <div align="justify">
