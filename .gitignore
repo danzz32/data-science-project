@@ -27,3 +27,6 @@ data/raw/*.txt
 
 docs/*
 !docs/*.qmd
+
+# Arquivos de Quarentena
+data/quarantine/*.parquet
