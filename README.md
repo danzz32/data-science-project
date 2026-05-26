@@ -41,7 +41,7 @@ powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/insta
 ```
 3. Executar a Ingestão (Camada Raw):
 ```bash
-   uv run python src/ingest.py
+   uv run src/ingest.py
 ```
 4. Executar o Pipeline de Qualidade e Transformação (Camada Trusted):
 ```bash
