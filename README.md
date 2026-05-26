@@ -224,7 +224,7 @@ print("Olá mundo")
 ```
 2. Para sincronizar as dependências do projeto:
 ```bash
-   uv sync
+   uv syncgit branch
 ```
 3. Executar a Ingestão (Camada Raw):
 ```bash
