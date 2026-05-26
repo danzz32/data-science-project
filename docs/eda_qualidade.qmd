@@ -51,10 +51,9 @@ else:
     print("⚠️ Nenhum ficheiro encontrado na pasta raw/.")
 ```
 
----
+
 # 1. Dimensão: Completude
 **Objetivo:** Identificar campos com valores ausentes (nulos), a proporção de falta e se existe algum padrão.
----
 
 ```{python}
 # Calcula a percentagem de nulos por coluna
@@ -73,20 +72,20 @@ display(df_nulos)
 ```
 
 📝 Conclusão da Equipe (Completude):
----
+
 # 2. Dimensão: Consistência
 **Objetivo:** Verificar contradições internas na base de dados.
 
 ```{python}
 # Verificação de consistência - PRF
-colunas_esperadas = ['mortos', 'feridos_leves', 'feridos_graves', 'tipo_veiculo']
+colunas_esperadas = ['mortos', 'feridos_leves', 'feridos_graves', 'veiculos']
 if all(c in df.columns for c in colunas_esperadas):
     # Valores numéricos não podem ser negativos
     negativos = df[(df['mortos'] < 0) | (df['feridos_leves'] < 0) | (df['feridos_graves'] < 0)]
     print(f"Registos com contagem negativa de vítimas: {len(negativos)}")
 
     # Inconsistência lógica: Acidente com vítimas, mas sem veículos envolvidos
-    sem_veiculo = df[(df['tipo_veiculo'] == 0) & ((df['mortos'] > 0) | (df['feridos_leves'] > 0))]
+    sem_veiculo = df[(df['veiculos'] == 0) & ((df['mortos'] > 0) | (df['feridos_leves'] > 0))]
     print(f"Registos com vítimas mas zero veículos envolvidos: {len(sem_veiculo)}")
 else:
     print("Colunas de vítimas/veículos não encontradas com estes nomes.")
@@ -94,10 +93,10 @@ else:
 
 📝 Conclusão da Equipe (Consistência):
 
----
+
 # 3. Dimensão: Acurácia
 **Objetivo:** Verificar se os valores existentes fazem sentido, analisar a tipagem correta e detetar outliers.
----
+
 
 ```{python}
 # 3.1 Verificação de Tipos Incorretos
@@ -125,10 +124,10 @@ if num_cols:
 
 📝 Conclusão da Equipe (Acurácia):
 
----
+
 # 4. Dimensão: Temporalidade
 **Objetivo:** Avaliar a correção das datas e a existência de lacunas no tempo ou datas futuras.
----
+
 
 ```{python}
 if 'data_inversa' in df.columns:
