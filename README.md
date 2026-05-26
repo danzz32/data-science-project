@@ -33,16 +33,19 @@ powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/insta
 
 1. Para baixar do repositório:
 ```bash
-   git clone https://github.com/fsbatalha-acad/data-science-project_v2.git
+   git clone https://github.com/danzz32/data-science-project.git
 ```
-4. Para sincronizar as dependências do projeto:
+2. Para sincronizar as dependências do projeto:
 ```bash
    uv sync
 ```
-7. Para executar os scripts dentro do ambiente virtual isolado:
+3. Executar a Ingestão (Camada Raw):
 ```bash
    uv run src/ingest.py
-   uv run src/transform.py
+```
+4. Executar o Pipeline de Qualidade e Transformação (Camada Trusted):
+```bash
+uv run python src/transform.py
 ```
 ## 🔐 Variáveis de Ambiente
 <div align="justify">
