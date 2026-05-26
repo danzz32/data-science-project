@@ -33,11 +33,11 @@ def main():
 
     # 4. Mapeamento de Anos e IDs 
     DATA_SOURCES = {
-        "2025": "1-PJGRbfSe7PVjU37A3wTCls_NRXyVGRD",
-        "2024": "14qBOhrE1gioVtuXgxkCJ9kCA8YtUGXKA",  
-        "2023": "1-caam_dahYOf2eorq4mez04Om6DD5d_3", 
-        "2022": "1wskEgRC3ame7rncSDQ7qWhKsoKw1lohY",
-        "2021": "1Gk3U6cMOZIevsDZHLi6J503xoCRS_lnI",
+        "2025": "1-G3MdmHBt6CprDwcW99xxC4BZ2DU5ryR",
+        "2024": "14lB0vqMFkaZj8HZ44b0njYgxs9nAN8KO",  
+        "2023": "1-WO3SfNrwwZ5_l7fRTiwBKRw7mi1-HUq", 
+        "2022": "1PRQjuV5gOn_nn6UNvaJyVURDIfbSAK4-",
+        "2021": "12xH8LX9aN2gObR766YN3cMcuycwyCJDz",
     }
 
     all_dataframes = []
