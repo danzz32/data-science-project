@@ -1,5 +1,5 @@
 # Relatório de Qualidade de Dados - Camada Trusted
-**Data de Execução:** 2026-05-26 17:00:17
+**Data de Execução:** 2026-05-27 17:11:20
 **Estratégia Adotada:** Quarentena Seletiva + Remoção Exata de Testemunhas via Lookup
 
 ## Resumo da Execução (Linhas)
@@ -16,8 +16,8 @@
 
 ## Eficiência de Armazenamento (CSV vs Parquet)
 * **Tamanho do Ficheiro Original (CSV):** 85.37 MB
-* **Tamanho do Ficheiro Destino (Parquet Trusted):** 13.71 MB
-* **Percentual de Redução de Espaço:** **83.94%** de economia em disco 📉
+* **Tamanho do Ficheiro Destino (Parquet Trusted):** 13.87 MB
+* **Percentual de Redução de Espaço:** **83.75%** de economia em disco 📉
 
 ## Motivos de Quarentena por Categoria (Erros Críticos)
 * **Duplicatas Exatas:** 0 registos
