@@ -3,6 +3,7 @@ import shutil
 import zipfile
 import gdown
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -33,7 +34,6 @@ def main():
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
     # 4. Mapeamento de Anos e IDs Duplos (Acidentes e Pessoas)
-    # Insira aqui os IDs corretos do Google Drive para cada categoria
     DATA_SOURCES = {
         "2025": {"acidentes": "1-G3MdmHBt6CprDwcW99xxC4BZ2DU5ryR", "pessoas": "1-PJGRbfSe7PVjU37A3wTCls_NRXyVGRD"},
         "2024": {"acidentes": "14lB0vqMFkaZj8HZ44b0njYgxs9nAN8KO", "pessoas": "14qBOhrE1gioVtuXgxkCJ9kCA8YtUGXKA"},  
@@ -43,12 +43,12 @@ def main():
     }
 
     all_dataframes_acidentes = []
-    all_dataframes_testemunhas = []
+    all_dataframes_lookups = []
     first_header = None
 
     print(f"🚀 Iniciando processamento duplo (Acidentes + Pessoas) de {len(DATA_SOURCES)} anos...")
 
-    # 5. Loop de Download, Validação e Extração de Testemunhas
+    # 5. Loop de Download, Validação e Extração Combinada (Testemunhas + Veículos Reais)
     for ano, ids in DATA_SOURCES.items():
         id_acidentes = ids["acidentes"]
         id_pessoas = ids["pessoas"]
@@ -96,7 +96,7 @@ def main():
                 csv_path.unlink()
 
             # -----------------------------------------------------------------
-            # PARTE B: PROCESSAR DATASET SECUNDÁRIO (PESSOAS) -> Abordagem de Lookup
+            # PARTE B: PROCESSAR DATASET SECUNDÁRIO (PESSOAS) -> Abordagem Lookup Expandida
             # -----------------------------------------------------------------
             print(f"📥 Baixando base de pessoas {ano}...")
             gdown.download(f"https://drive.google.com/uc?id={id_pessoas}", str(zip_pessoas), quiet=True)
@@ -106,24 +106,33 @@ def main():
                 zip_ref.extract(csv_name_pessoas, path=TEMP_DIR)
                 csv_path_pessoas = TEMP_DIR / csv_name_pessoas
 
-            # STREAMING SELETIVO: Lê apenas o ID e o Tipo de Envolvido para poupar muita memória RAM
+            # STREAMING SELETIVO EXPANDIDO: Inclui 'id_veiculo' para corrigir a inflação de frotas
             df_pessoas = pd.read_csv(
                 csv_path_pessoas, 
                 sep=';', 
                 encoding='latin-1', 
-                usecols=['id', 'tipo_envolvido'], 
+                usecols=['id', 'tipo_envolvido', 'id_veiculo'], 
                 low_memory=False
             )
 
-            # Padroniza strings para contagem exata
+            # Padroniza strings de controle para evitar falhas de case/espaço
             df_pessoas['tipo_envolvido'] = df_pessoas['tipo_envolvido'].astype(str).str.lower().str.strip()
             
-            # Filtra apenas testemunhas e agrupa contando as ocorrências por ID
+            # Sub-processamento 1: Isolamento e contagem de Testemunhas por Acidente (ID)
             df_testemunhas = df_pessoas[df_pessoas['tipo_envolvido'] == 'testemunha']
-            df_contagem = df_testemunhas.groupby('id').size().reset_index(name='total_testemunhas')
+            df_contagem_testemunhas = df_testemunhas.groupby('id').size().reset_index(name='total_testemunhas')
             
-            all_dataframes_testemunhas.append(df_contagem)
-            print(f"✅ Pessoas {ano}: Isoladas testemunhas de {len(df_contagem)} acidentes diferentes.")
+            # Sub-processamento 2: Contagem de Veículos ÚNICOS reais por Acidente (ID)
+            # Remove nulos e zeros lógicos para isolar apenas IDs de veículos válidos
+            df_veiculos_validos = df_pessoas.dropna(subset=['id_veiculo'])
+            df_veiculos_validos = df_veiculos_validos[df_veiculos_validos['id_veiculo'] != 0]
+            df_contagem_veiculos = df_veiculos_validos.groupby('id')['id_veiculo'].nunique().reset_index(name='veiculos_reais')
+            
+            # Consolidação das duas métricas da partição anual em uma tabela de junção parcial
+            df_lookup_ano = pd.merge(df_contagem_veiculos, df_contagem_testemunhas, on='id', how='outer').fillna(0)
+            
+            all_dataframes_lookups.append(df_lookup_ano)
+            print(f"✅ Pessoas {ano}: Agregados dados de testemunhas e frotas reais para {len(df_lookup_ano)} ocorrências.")
 
             # Deleta o CSV de pessoas extraído
             if csv_path_pessoas.exists():
@@ -143,18 +152,25 @@ def main():
         print(f"📊 Total de registros agregados: {len(df_final_acidentes):,}".replace(',', '.'))
         print(f"💾 Tamanho do CSV: {FINAL_FILE.stat().st_size / (1024*1024):.2f} MB")
         
-    # Destino 2: O arquivo consolidado de Lookup (Testemunhas dos 5 anos juntos)
-    if all_dataframes_testemunhas:
-        print("\n--- ⚙️ Consolidando Lookup Table de Testemunhas ---")
-        df_final_lookup = pd.concat(all_dataframes_testemunhas, ignore_index=True)
+    # Destino 2: O arquivo consolidado de Lookup Mestre (Testemunhas + Veículos Reais unificados)
+    if all_dataframes_lookups:
+        print("\n--- ⚙️ Consolidando Lookup Table Mestre (Testemunhas + Frotas Reais) ---")
+        df_final_lookup = pd.concat(all_dataframes_lookups, ignore_index=True)
         
-        # Garante soma caso um ID se repita em arquivos cruzados
-        df_final_lookup = df_final_lookup.groupby('id')['total_testemunhas'].sum().reset_index()
+        # Agrupa os IDs aplicando as agregações matemáticas adequadas caso haja sobreposição
+        df_final_lookup = df_final_lookup.groupby('id').agg({
+            'veiculos_reais': 'max',  # ID do veículo é imutável na série, o maior número de únicos persiste
+            'total_testemunhas': 'sum' # Testemunhas extras são somadas se houver duplicidade cruzada
+        }).reset_index()
         
-        # Salva em PARQUET: Levíssimo, rápido e tipado
+        # Garante integridade do tipo de dado inteiro para armazenamento otimizado
+        df_final_lookup['veiculos_reais'] = df_final_lookup['veiculos_reais'].astype(int)
+        df_final_lookup['total_testemunhas'] = df_final_lookup['total_testemunhas'].astype(int)
+        
+        # Salva em PARQUET: Levíssimo, rápido, estruturado e tipado
         df_final_lookup.to_parquet(LOOKUP_FILE, index=False)
-        print(f"✅ Lookup Table gerada com sucesso em: {LOOKUP_FILE}")
-        print(f"📊 IDs mapeados com testemunhas: {len(df_final_lookup):,}".replace(',', '.'))
+        print(f"✅ Lookup Table mestre gerada com sucesso em: {LOOKUP_FILE}")
+        print(f"📊 Total de acidentes mapeados no Lookup: {len(df_final_lookup):,}".replace(',', '.'))
         print(f"💾 Tamanho do Parquet: {LOOKUP_FILE.stat().st_size / 1024:.2f} KB")
 
     # 7. Limpeza e expurgo final da pasta temporária

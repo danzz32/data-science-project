@@ -27,6 +27,7 @@ data/raw/*.csv
 data/raw/*.zip
 data/raw/*.json
 data/raw/*.txt
+data/raw/*.parquet
 !data/raw/.gitkeep
 
 # --- CAMADA TRUSTED ---
