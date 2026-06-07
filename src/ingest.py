@@ -2,11 +2,18 @@ import os
 import shutil
 import zipfile
 import gdown
-import pandas as pd
-import numpy as np
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
+
+def contar_linhas_arquivo(caminho_arquivo: Path) -> int:
+    """Conta de forma eficiente a quantidade de registros sem carregar o arquivo na RAM."""
+    linhas = 0
+    with open(caminho_arquivo, 'r', encoding='latin-1') as f:
+        for _ in f:
+            linhas += 1
+    # Subtrai 1 para remover o cabeçalho da contagem de registros reais
+    return max(0, linhas - 1)
 
 def main():
     # 1. Carrega as variáveis de ambiente do arquivo .env
@@ -17,163 +24,104 @@ def main():
     RAW_DIR = PROJECT_ROOT / "data" / "raw"
     TEMP_DIR = RAW_DIR / "temp_extraction" 
     
-    # Gerando a data da ingestão para o arquivo principal
+    # Gerando a data da ingestão para o arquivo principal bruto ajustado para o padrão mestre
     datestamp = datetime.now().strftime("%Y-%m-%d")
-    FINAL_FILE = RAW_DIR / f"prf_191_{datestamp}.csv"
-    LOOKUP_FILE = RAW_DIR / "lookup_testemunhas.parquet"
+    FINAL_RAW_FILE = RAW_DIR / f"prf_191_{datestamp}.csv"
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 3. Check de Idempotência (Validador de existência)
-    if FINAL_FILE.exists() and LOOKUP_FILE.exists():
-        print(f"⚠️  Atenção: Os arquivos de ingestão para o dia {datestamp} já existem.")
-        print("⏭️  Pulando a ingestão para evitar duplicidade e retrabalho.")
+    # 3. Check de Idempotência (Garante append-only e evita retrabalho)
+    if FINAL_RAW_FILE.exists():
+        print(f"⚠️  Atenção: O arquivo bruto para o dia {datestamp} já existe na RAW.")
+        print("⏭️  Pulando a ingestão para garantir a imutabilidade do diretório.")
         return
 
     # Só cria a pasta temporária se o processo for realmente rodar
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 4. Mapeamento de Anos e IDs Duplos (Acidentes e Pessoas)
+    # 4. Mapeamento de Anos usando EXCLUSIVAMENTE os IDs do Dataset Geral/Complexo
     DATA_SOURCES = {
-        "2025": {"acidentes": "1-G3MdmHBt6CprDwcW99xxC4BZ2DU5ryR", "pessoas": "1-PJGRbfSe7PVjU37A3wTCls_NRXyVGRD"},
-        "2024": {"acidentes": "14lB0vqMFkaZj8HZ44b0njYgxs9nAN8KO", "pessoas": "14qBOhrE1gioVtuXgxkCJ9kCA8YtUGXKA"},  
-        "2023": {"acidentes": "1-WO3SfNrwwZ5_l7fRTiwBKRw7mi1-HUq", "pessoas": "1-caam_dahYOf2eorq4mez04Om6DD5d_3"}, 
-        "2022": {"acidentes": "1PRQjuV5gOn_nn6UNvaJyVURDIfbSAK4-", "pessoas": "1wskEgRC3ame7rncSDQ7qWhKsoKw1lohY"},
-        "2021": {"acidentes": "12xH8LX9aN2gObR766YN3cMcuycwyCJDz", "pessoas": "1Gk3U6cMOZIevsDZHLi6J503xoCRS_lnI"},
+        "2025": "1-PJGRbfSe7PVjU37A3wTCls_NRXyVGRD",
+        "2024": "14qBOhrE1gioVtuXgxkCJ9kCA8YtUGXKA",  
+        "2023": "1-caam_dahYOf2eorq4mez04Om6DD5d_3", 
+        "2022": "1wskEgRC3ame7rncSDQ7qWhKsoKw1lohY",
+        "2021": "1Gk3U6cMOZIevsDZHLi6J503xoCRS_lnI",
     }
 
-    all_dataframes_acidentes = []
-    all_dataframes_lookups = []
-    first_header = None
+    print(f"🚀 Iniciando download do dataset geral de {len(DATA_SOURCES)} anos...")
 
-    print(f"🚀 Iniciando processamento duplo (Acidentes + Pessoas) de {len(DATA_SOURCES)} anos...")
+    # Lista para controlar os arquivos CSV descompactados temporariamente
+    temp_csv_files = []
+    relatorio_linhas_por_ano = {}
 
-    # 5. Loop de Download, Validação e Extração Combinada (Testemunhas + Veículos Reais)
-    for ano, ids in DATA_SOURCES.items():
-        id_acidentes = ids["acidentes"]
-        id_pessoas = ids["pessoas"]
-
-        if id_acidentes.startswith("ID_AQUI") or id_pessoas.startswith("ID_AQUI"):
-            print(f"⚠️  Pulando ano {ano}: IDs não configurados completamente.")
-            continue
-
+    # 5. Loop de Ingestão de Dados Brutos
+    for ano, id_drive in DATA_SOURCES.items():
         print(f"\n--- 📅 Processando Ano: {ano} ---")
-        
-        # Paths temporários para os ZIPs
-        zip_acidentes = TEMP_DIR / f"acidentes_{ano}.zip"
-        zip_pessoas = TEMP_DIR / f"pessoas_{ano}.zip"
+        zip_path = TEMP_DIR / f"geral_{ano}.zip"
         
         try:
-            # -----------------------------------------------------------------
-            # PARTE A: PROCESSAR DATASET PRINCIPAL (ACIDENTES)
-            # -----------------------------------------------------------------
-            print(f"📥 Baixando base de acidentes {ano}...")
-            gdown.download(f"https://drive.google.com/uc?id={id_acidentes}", str(zip_acidentes), quiet=True)
+            print(f"📥 Baixando arquivo comprimido do ano {ano}...")
+            gdown.download(f"https://drive.google.com/uc?id={id_drive}", str(zip_path), quiet=True)
 
-            with zipfile.ZipFile(zip_acidentes, 'r') as zip_ref:
-                csv_name = zip_ref.namelist()[0]
-                zip_ref.extract(csv_name, path=TEMP_DIR)
-                csv_path = TEMP_DIR / csv_name
+            print(f"📦 Extraindo conteúdo bruto...")
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                csv_original_name = zip_ref.namelist()[0]
+                # Criamos um nome padronizado temporário para evitar conflitos de encoding no file system
+                csv_temp_path = TEMP_DIR / f"raw_{ano}.csv"
+                
+                zip_ref.extract(csv_original_name, path=TEMP_DIR)
+                (TEMP_DIR / csv_original_name).rename(csv_temp_path)
+                
+                temp_csv_files.append(csv_temp_path)
+                print(f"✅ Ano {ano} extraído com sucesso.")
 
-            df_acidentes = pd.read_csv(csv_path, sep=';', encoding='latin-1', low_memory=False)
-            current_header = list(df_acidentes.columns)
-
-            # Validação de Estrutura (Garante que os CSVs de acidentes empilham perfeitamente)
-            if first_header is None:
-                first_header = current_header
-                all_dataframes_acidentes.append(df_acidentes)
-                print(f"✅ Acidentes {ano}: Base definida como padrão ({len(df_acidentes)} linhas).")
-            else:
-                if current_header == first_header:
-                    all_dataframes_acidentes.append(df_acidentes)
-                    print(f"✅ Acidentes {ano}: Cabeçalho validado ({len(df_acidentes)} linhas).")
-                else:
-                    print(f"❌ Acidentes {ano}: ERRO! Cabeçalho incompatível. Ignorando este ano.")
-                    continue  # Pula o processamento de pessoas se a base de acidentes falhar
-
-            # Deleta o CSV de acidentes extraído para liberar espaço antes de baixar o próximo
-            if csv_path.exists():
-                csv_path.unlink()
-
-            # -----------------------------------------------------------------
-            # PARTE B: PROCESSAR DATASET SECUNDÁRIO (PESSOAS) -> Abordagem Lookup Expandida
-            # -----------------------------------------------------------------
-            print(f"📥 Baixando base de pessoas {ano}...")
-            gdown.download(f"https://drive.google.com/uc?id={id_pessoas}", str(zip_pessoas), quiet=True)
-
-            with zipfile.ZipFile(zip_pessoas, 'r') as zip_ref:
-                csv_name_pessoas = zip_ref.namelist()[0]
-                zip_ref.extract(csv_name_pessoas, path=TEMP_DIR)
-                csv_path_pessoas = TEMP_DIR / csv_name_pessoas
-
-            # STREAMING SELETIVO EXPANDIDO: Inclui 'id_veiculo' para corrigir a inflação de frotas
-            df_pessoas = pd.read_csv(
-                csv_path_pessoas, 
-                sep=';', 
-                encoding='latin-1', 
-                usecols=['id', 'tipo_envolvido', 'id_veiculo'], 
-                low_memory=False
-            )
-
-            # Padroniza strings de controle para evitar falhas de case/espaço
-            df_pessoas['tipo_envolvido'] = df_pessoas['tipo_envolvido'].astype(str).str.lower().str.strip()
-            
-            # Sub-processamento 1: Isolamento e contagem de Testemunhas por Acidente (ID)
-            df_testemunhas = df_pessoas[df_pessoas['tipo_envolvido'] == 'testemunha']
-            df_contagem_testemunhas = df_testemunhas.groupby('id').size().reset_index(name='total_testemunhas')
-            
-            # Sub-processamento 2: Contagem de Veículos ÚNICOS reais por Acidente (ID)
-            # Remove nulos e zeros lógicos para isolar apenas IDs de veículos válidos
-            df_veiculos_validos = df_pessoas.dropna(subset=['id_veiculo'])
-            df_veiculos_validos = df_veiculos_validos[df_veiculos_validos['id_veiculo'] != 0]
-            df_contagem_veiculos = df_veiculos_validos.groupby('id')['id_veiculo'].nunique().reset_index(name='veiculos_reais')
-            
-            # Consolidação das duas métricas da partição anual em uma tabela de junção parcial
-            df_lookup_ano = pd.merge(df_contagem_veiculos, df_contagem_testemunhas, on='id', how='outer').fillna(0)
-            
-            all_dataframes_lookups.append(df_lookup_ano)
-            print(f"✅ Pessoas {ano}: Agregados dados de testemunhas e frotas reais para {len(df_lookup_ano)} ocorrências.")
-
-            # Deleta o CSV de pessoas extraído
-            if csv_path_pessoas.exists():
-                csv_path_pessoas.unlink()
+                # Realiza a contagem volumétrica do ano corrente de forma otimizada
+                qtd_linhas = contar_linhas_arquivo(csv_temp_path)
+                relatorio_linhas_por_ano[ano] = qtd_linhas
+                print(f"📊 Volumetria Identificada para {ano}: {qtd_linhas:,} registros.")
 
         except Exception as e:
-            print(f"❌ Erro crítico ao processar o ano {ano}: {e}")
+            print(f"❌ Erro crítico ao baixar/extrair o ano {ano}: {e}")
 
-    # 6. Consolidação dos Dois Destinos Finais (Fora do Loop)
-    
-    # Destino 1: O arquivo consolidado de Acidentes
-    if all_dataframes_acidentes:
-        print("\n--- 📦 Consolidando Base de Acidentes ---")
-        df_final_acidentes = pd.concat(all_dataframes_acidentes, ignore_index=True)
-        df_final_acidentes.to_csv(FINAL_FILE, sep=';', encoding='latin-1', index=False)
-        print(f"✨ Sucesso! Base de acidentes salva em: {FINAL_FILE}")
-        print(f"📊 Total de registros agregados: {len(df_final_acidentes):,}".replace(',', '.'))
-        print(f"💾 Tamanho do CSV: {FINAL_FILE.stat().st_size / (1024*1024):.2f} MB")
-        
-    # Destino 2: O arquivo consolidado de Lookup Mestre (Testemunhas + Veículos Reais unificados)
-    if all_dataframes_lookups:
-        print("\n--- ⚙️ Consolidando Lookup Table Mestre (Testemunhas + Frotas Reais) ---")
-        df_final_lookup = pd.concat(all_dataframes_lookups, ignore_index=True)
-        
-        # Agrupa os IDs aplicando as agregações matemáticas adequadas caso haja sobreposição
-        df_final_lookup = df_final_lookup.groupby('id').agg({
-            'veiculos_reais': 'max',  # ID do veículo é imutável na série, o maior número de únicos persiste
-            'total_testemunhas': 'sum' # Testemunhas extras são somadas se houver duplicidade cruzada
-        }).reset_index()
-        
-        # Garante integridade do tipo de dado inteiro para armazenamento otimizado
-        df_final_lookup['veiculos_reais'] = df_final_lookup['veiculos_reais'].astype(int)
-        df_final_lookup['total_testemunhas'] = df_final_lookup['total_testemunhas'].astype(int)
-        
-        # Salva em PARQUET: Levíssimo, rápido, estruturado e tipado
-        df_final_lookup.to_parquet(LOOKUP_FILE, index=False)
-        print(f"✅ Lookup Table mestre gerada com sucesso em: {LOOKUP_FILE}")
-        print(f"📊 Total de acidentes mapeados no Lookup: {len(df_final_lookup):,}".replace(',', '.'))
-        print(f"💾 Tamanho do Parquet: {LOOKUP_FILE.stat().st_size / 1024:.2f} KB")
+    # 6. Empilhamento e Consolidação dos CSVs Brutos (Mantendo formato original)
+    if temp_csv_files:
+        print("\n--- 📦 Consolidando Arquivo Final na Camada RAW ---")
+        try:
+            first_file = True
+            with open(FINAL_RAW_FILE, 'w', encoding='latin-1') as outfile:
+                for temp_csv in temp_csv_files:
+                    with open(temp_csv, 'r', encoding='latin-1') as infile:
+                        # Lê a primeira linha (cabeçalho)
+                        header = infile.readline()
+                        
+                        # Se for o primeiro arquivo da lista, escreve o cabeçalho
+                        if first_file:
+                            outfile.write(header)
+                            first_file = False
+                        
+                        # Escreve o restante das linhas do corpo do arquivo
+                        shutil.copyfileobj(infile, outfile)
+                    print(f"➕ Agregado com sucesso: {temp_csv.name}")
 
-    # 7. Limpeza e expurgo final da pasta temporária
+            # Contagem final e emissão dos indicadores para a governança
+            total_geral_registros = contar_linhas_arquivo(FINAL_RAW_FILE)
+
+            print("\n==========================================================")
+            print("📊 RELATÓRIO DE VOLUMETRIA POR SÉRIE HISTÓRICA (RAW)")
+            print("==========================================================")
+            for ano_ref, total_ano in sorted(relatorio_linhas_por_ano.items()):
+                print(f" ──> Ano {ano_ref}: {total_ano:,} linhas de indivíduos.")
+            print("──────────────────────────────────────────────────────────")
+            print(f" Total Geral Consolidado: {total_geral_registros:,} registros empilhados.")
+            print("==========================================================")
+
+            print(f"\n✨ Sucesso! Base geral imutável salva em: {FINAL_RAW_FILE}")
+            print(f"💾 Tamanho total do CSV bruto: {FINAL_RAW_FILE.stat().st_size / (1024*1024):.2f} MB")
+
+        except Exception as e:
+            print(f"❌ Erro ao consolidar os arquivos CSV: {e}")
+
+    # 7. Limpeza e expurgo da pasta temporária
     if TEMP_DIR.exists():
         shutil.rmtree(TEMP_DIR)
     print("\n🧹 Pasta temporária limpa com sucesso. Ingestão Concluída!")
