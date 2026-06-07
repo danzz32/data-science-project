@@ -1,27 +1,16 @@
-# Relatório de Qualidade de Dados - Camada Trusted
-**Data de Execução:** 2026-05-27 17:11:20
-**Estratégia Adotada:** Quarentena Seletiva + Remoção Exata de Testemunhas via Lookup
+# Relatório de Qualidade de Dados - Camada Trusted (DuckDB Motor)
+**Data de Execução:** 2026-06-07 16:24:19
+**Estratégia Computacional:** Arquitetura Vetorizada de Alta Performance com DuckDB
 
 ## Resumo da Execução (Linhas)
-* **Total de Registos Lidos (Raw):** 342624
-* **Total Aprovados na Validação:** 342624
-* **Total Enviados para Quarentena:** 0
+* **Total de Registros Lidos (Layer Raw):** 2,702,004
+* **Total Aprovados pelo Pipeline:** 2,702,004
+* **Total Isolados na Quarentena:** 0
 
-## Governança e Tratamento Multidimensional de Dados 💡
-* **Total de Testemunhas Removidas da Base Analítica:** 56130 testemunhas removidas com sucesso de `pessoas_reais`
+## Eficiência de Armazenamento e Compressão 📉
+* **Tamanho do Arquivo Bruto (CSV):** 986.75 MB
+* **Tamanho do Arquivo Otimizado (Parquet Trusted):** 32.67 MB
+* **Ganho de Economia em Disco:** **96.69%** reduzidos com codificação Parquet e Compressão Snappy
 
-## Correções Automáticas Aplicadas (Dados Salvos do Descarte) ✔️
-* **Formatos de Data Corrigidos (Invertidos para Padrão):** 342624 registos salvos
-* **Contradições Vitimológicas Ajustadas (Morto & Ileso):** 13389 registos salvos
-
-## Eficiência de Armazenamento (CSV vs Parquet)
-* **Tamanho do Ficheiro Original (CSV):** 85.37 MB
-* **Tamanho do Ficheiro Destino (Parquet Trusted):** 13.87 MB
-* **Percentual de Redução de Espaço:** **83.75%** de economia em disco 📉
-
-## Motivos de Quarentena por Categoria (Erros Críticos)
-* **Duplicatas Exatas:** 0 registos
-* **Temporalidade (Datas totalmente corrompidas/ilegíveis):** 0 registos
-* **Acurácia (UF inválida):** 0 registos
-* **Consistência (Dados contraditórios irrecuperáveis):** 0 registos
-* **Completude (Município nulo):** 0 registos
+## Detalhamento de Erros de Quarentena
+* **Falhas Críticas de Parsing (ID ou Data Nula):** 0 registros
