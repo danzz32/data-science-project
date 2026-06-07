@@ -20,35 +20,59 @@ Este notebook tem como objetivo documentar o perfil de qualidade dos dados bruto
 ## Setup e Carregamento
 
 ```{python}
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import duckdb
+import os
 from pathlib import Path
 
-# Configurações visuais
-sns.set_theme(style="whitegrid")
+print("🦅 Inicializando DuckDB para Análise Exploratória Bruta (Camada RAW)...")
 
-# Configuração de Caminhos para a pasta raw/
-PROJECT_ROOT = Path.cwd().parent
+# 1. Configuração de caminhos dinâmicos
+PROJECT_ROOT = Path(os.getcwd()).resolve().parent
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 
-# Busca o ficheiro bruto mais recente
-arquivos_encontrados = list(RAW_DIR.glob("prf_191_*.csv"))
+# Localiza o arquivo CSV mais recente gerado pelo ingest
+arquivos_csv = list(RAW_DIR.glob("prf_191_*.csv"))
 
-if arquivos_encontrados:
-    RAW_FILE_PATH = max(arquivos_encontrados, key=lambda p: p.stat().st_mtime)
-    print(f"📂 A ler ficheiro: {RAW_FILE_PATH.name}")
-
-    # Leitura com os padrões do governo (latin-1, separador ponto e vírgula)
-    df = pd.read_csv(RAW_FILE_PATH, sep=';', encoding='latin-1', low_memory=False)
-    print(f"🎯 Total de registos iniciais: {len(df)}")
-    print(f"🎯 Total de colunas: {len(df.columns)}")
+if arquivos_csv:
+    PATH_CSV_BRUTO = arquivos_csv[-1]
+    print(f"📁 Arquivo localizado: {PATH_CSV_BRUTO.name}")
     
-    print("\nAs colunas da base são:")
-    print(df.columns.tolist())
+    # Abre a conexão do DuckDB em memória
+    con = duckdb.connect(database=':memory:')
+    
+    # Criamos uma VIEW temporária no DuckDB para não precisar repetir o read_csv_auto em cada query
+    con.execute(f"""
+        CREATE OR REPLACE VIEW v_prf_bruto AS 
+        SELECT * FROM read_csv_auto('{PATH_CSV_BRUTO}', delim=';', encoding='latin-1');
+    """)
+    
+    # 2. Mapeando e exibindo o Schema detectado automaticamente
+    print("\n📋 [Etapa 1.1] Esquema de Colunas e Tipos Identificados pelo DuckDB:")
+    schema_df = con.execute("DESCRIBE v_prf_bruto;").df()
+    display(schema_df[['column_name', 'column_type']])
+    
+    # 3. Análise dos Identificadores Estruturais Usados nos Registros
+    print("\n🔍 [Etapa 1.2] Análise dos Identificadores (Chaves Logísticas) presentes na Base:")
+    
+    # Query para avaliar o comportamento e cardinalidade dos IDs principais
+    chaves_analise = con.execute("""
+        SELECT 
+            COUNT(DISTINCT id) as acidentes_unicos,
+            COUNT(DISTINCT id_veiculo) as veiculos_unicos,
+            COUNT(*) as total_linhas_pessoas
+        FROM v_prf_bruto;
+    """).df()
+    
+    # Formatando a saída para exibição limpa
+    print(f"   • ID do Acidente (Ocorrência) : {chaves_analise['acidentes_unicos'].values[0]:,} chaves únicas.".replace(',', '.'))
+    print(f"   • ID do Veículo               : {chaves_analise['veiculos_unicos'].values[0]:,} frotas únicas identificadas.".replace(',', '.'))
+    print(f"   • Linhas Totais (Pessoas)     : {chaves_analise['total_linhas_pessoas'].values[0]:,} registros de envolvidos.".replace(',', '.'))
+    
+    # 4. Volumetria Geral Bruta
+    print(f"\n📊 Volumetria Total na Camada RAW: {chaves_analise['total_linhas_pessoas'].values[0]:,} registros (linhas por pessoa/envolvido).".replace(',', '.'))
+
 else:
-    print("⚠️ Nenhum ficheiro encontrado na pasta raw/.")
+    print(f"❌ Erro: Nenhum arquivo CSV 'prf_geral_bruto_*.csv' foi localizado em {RAW_DIR}")
 ```
 
 
@@ -56,325 +80,580 @@ else:
 **Objetivo:** Identificar campos com valores ausentes (nulos), a proporção de falta e se existe algum padrão.
 
 ```{python}
-# ==========================================
-# PARTE 1: Visão Geral da Completude 
-# ==========================================
+import duckdb
+import os
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+from pathlib import Path
 
-print("🎯 Iniciando Testes de Completude dos Dados...\n") 
+print("🎯 Iniciando Diagnóstico de Completude e Repetição de Identificadores...\n")
 
-# Calcula a percentagem de nulos por coluna
-nulos = df.isnull().sum()
-nulos_pct = (nulos / len(df)) * 100
+# 1. Configuração de caminhos dinâmicos
+PROJECT_ROOT = Path(os.getcwd()).resolve().parent
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
 
-# Filtra apenas colunas que possuem nulos e ordena de forma decrescente
-df_nulos = pd.DataFrame({
-    'Total_Nulos': nulos,
-    'Percentagem (%)': nulos_pct
-}).sort_values(by='Total_Nulos', ascending=False)
+arquivos_csv = list(RAW_DIR.glob("prf_191_*.csv"))
 
-# Criamos uma cópia formatada para exibição visual limpa
-df_nulos_view = df_nulos.copy()
-df_nulos_view['Percentagem (%)'] = df_nulos_view['Percentagem (%)'].map('{:.2f}%'.format)
-
-print("📊 Tabela Geral de Campos Ausentes:")
-display(df_nulos_view[df_nulos['Total_Nulos'] > 0])
-
-# ==========================================
-# PARTE 2: Investigação de Padrões (O Requisito do PDF!)
-# ==========================================
-# Vamos escolher a coluna com maior número de nulos para investigar o padrão.
-# Substitua 'municipio' ou a coluna crítica que encontrar no seu print abaixo:
-coluna_critica = df_nulos[df_nulos['Total_Nulos'] > 0].index[0] if any(nulos > 0) else None
-
-if coluna_critica:
-    print(f"\n🔍 Investigando padrões de ausência para a coluna: '{coluna_critica}'")
+if arquivos_csv:
+    PATH_CSV_BRUTO = arquivos_csv[-1]
+    con = duckdb.connect(database=':memory:')
     
-    # Criamos uma coluna booleana temporária indicando se o dado é nulo
-    df['is_null_critico'] = df[coluna_critica].isnull()
+    # Cria a view mestre no DuckDB para otimizar as queries
+    con.execute(f"""
+        CREATE OR REPLACE VIEW v_prf_bruto AS 
+        SELECT * FROM read_csv_auto('{PATH_CSV_BRUTO}', delim=';', encoding='latin-1', all_varchar=True);
+    """)
     
-    # A. Padrão Temporal: Os nulos estão concentrados em algum ano/período específico?
-    # Extrai o ano se a coluna data_inversa já tiver sido convertida no notebook
-    if pd.api.types.is_datetime64_any_dtype(df['data_inversa']):
-        df['ano_analise'] = df['data_inversa'].dt.year
+    # Detecta qual é a coluna de identificação de pessoas disponível
+    colunas_disponiveis = [col[0] for col in con.execute("DESCRIBE v_prf_bruto;").fetchall()]
+    col_pessoa = 'pesid' if 'pesid' in colunas_disponiveis else ('id_envolvido' if 'id_envolvido' in colunas_disponiveis else None)
+
+    # =====================================================================
+    # PARTE 1: CONTADOR DE REPETIÇÃO DOS IDENTIFICADORES (Granularidade)
+    # =====================================================================
+    print("🔄 [Análise de Repetição] Avaliando a frequência de chaves no dataset geral:")
+    
+    query_repeticao = """
+        WITH freq_acidentes AS (
+            SELECT id, COUNT(*) as qtd FROM v_prf_bruto GROUP BY id
+        ),
+        freq_veiculos AS (
+            SELECT id_veiculo, COUNT(*) as qtd FROM v_prf_bruto WHERE id_veiculo IS NOT NULL AND id_veiculo != '0' GROUP BY id_veiculo
+        )
+    """
+    
+    if col_pessoa:
+        query_repeticao += f""",
+        freq_pessoas AS (
+            SELECT {col_pessoa}, COUNT(*) as qtd FROM v_prf_bruto GROUP BY {col_pessoa}
+        )
+        """
+        
+    query_repeticao += """
+        SELECT 
+            (SELECT AVG(qtd) FROM freq_acidentes) as avg_acidente,
+            (SELECT MAX(qtd) FROM freq_acidentes) as max_acidente,
+            (SELECT AVG(qtd) FROM freq_veiculos) as avg_veiculo,
+            (SELECT MAX(qtd) FROM freq_veiculos) as max_veiculo
+    """
+    
+    if col_pessoa:
+        query_repeticao += """,
+            (SELECT AVG(qtd) FROM freq_pessoas) as avg_pessoa,
+            (SELECT MAX(qtd) FROM freq_pessoas) as max_pessoa;
+        """
     else:
-        df['ano_analise'] = pd.to_datetime(df['data_inversa'], errors='coerce').dt.year
+        query_repeticao += """,
+            1.0 as avg_pessoa,
+            1 as max_pessoa;
+        """
         
-    padrao_temporal = pd.crosstab(df['ano_analise'], df['is_null_critico'], normalize='index') * 100
-    print("\n📅 Distribuição de Ausências por Ano (%):")
-    display(padrao_temporal.round(2))
+    frequencia_ids = con.execute(query_repeticao).df()
     
-    # B. Padrão Categórico: Os nulos se concentram em alguma categoria (Ex: UF ou Classificação)?
-    if 'uf' in df.columns:
-        padrao_categorico = pd.crosstab(df['uf'], df['is_null_critico'], normalize='index') * 100
-        print("\n📍 Distribuição de Ausências por UF (%):")
-        display(padrao_categorico.round(2))
+    # Valores extraídos para variáveis locais para prevenir qualquer quebra sintática de f-string longa
+    avg_ac, max_ac = frequencia_ids['avg_acidente'].values[0], frequencia_ids['max_acidente'].values[0]
+    avg_vc, max_vc = frequencia_ids['avg_veiculo'].values[0], frequencia_ids['max_veiculo'].values[0]
+    
+    print(f"   • ID do Acidente : Média {avg_ac:.2f} linhas/ocorrência (Máx: {max_ac}).")
+    print(f"   • ID do Veículo  : Média {avg_vc:.2f} linhas/veículo (Máx: {max_vc}).")
+    
+    if col_pessoa:
+        avg_ps, max_ps = frequencia_ids['avg_pessoa'].values[0], frequencia_ids['max_pessoa'].values[0]
+        print(f"   • ID da Pessoa ('{col_pessoa}'): Média {avg_ps:.2f} linhas/indivíduo (Máx: {max_ps}).")
+
+    # =====================================================================
+    # PARTE 2: VISÃO GERAL DA COMPLETUDE (Percentual de Nulos por Coluna)
+    # =====================================================================
+    print("\n📊 [Completude] Calculando a taxa de preenchimento e ausência por coluna...")
+    
+    # Captura o total de linhas para o cálculo percentual
+    total_linhas = con.execute("SELECT COUNT(*) FROM v_prf_bruto;").fetchone()[0]
+    print(f"   • Volume de amostragem: {total_linhas:,} linhas analisadas.".replace(',', '.'))
+    
+    # Construção dinâmica da query de contagem de nulos para cada coluna (detecta vazios, nulos e 'NA')
+    select_nulos = ", ".join([f"COUNT(CASE WHEN {col} IS NULL OR {col} = '' OR {col} = 'NA' THEN 1 END) as {col}" for col in colunas_disponiveis])
+    df_contagem_nulos = con.execute(f"SELECT {select_nulos} FROM v_prf_bruto;").df()
+    
+    # Transpõe o resultado para estruturar o DataFrame de ranking de completude
+    df_nulos = pd.DataFrame({
+        'Total_Nulos': df_contagem_nulos.iloc[0].values,
+        'Percentual_Nulos (%)': (df_contagem_nulos.iloc[0].values / total_linhas) * 100
+    }, index=colunas_disponiveis).sort_values(by='Total_Nulos', ascending=False)
+    
+    # Cópia formatada para exibição no Quarto/Notebook (Garantindo o sinal de %)
+    df_nulos_view = df_nulos.copy()
+    df_nulos_view['Percentual_Nulos (%)'] = df_nulos_view['Percentual_Nulos (%)'].map('{:.2f}%'.format)
+    df_nulos_view['Total_Nulos'] = df_nulos_view['Total_Nulos'].map('{:,}'.format).str.replace(',', '.')
+    
+    print("\n📋 Tabela Completa de Completude (Todas as Colunas do Dataset Bruto):")
+    display(df_nulos_view)
+
+    # =====================================================================
+    # PARTE 3: INVESTIGAÇÃO DE PADRÕES (O Requisito do PDF)
+    # =====================================================================
+    # Filtra colunas com nulos reais excluindo os IDs de controle para encontrar a variável de negócio mais crítica
+    colunas_com_nulos = df_nulos[(df_nulos['Total_Nulos'] > 0) & (~df_nulos.index.isin(['id_veiculo', col_pessoa, 'id']))]
+    coluna_critica = colunas_com_nulos.index[0] if not colunas_com_nulos.empty else None
+
+    if coluna_critica:
+        print(f"\n🔍 [Investigação] Analisando padrões de ausência para a coluna mais crítica: '{coluna_critica}'")
         
-    # Limpeza de colunas temporárias de diagnóstico
-    df.drop(columns=['is_null_critico', 'ano_analise'], inplace=True, errors='ignore')
+        # A. Padrão Temporal: Distribuição por Ano
+        print("\n📅 Distribuição de Ausências por Ano (%):")
+        padrao_temporal = con.execute(f"""
+            SELECT 
+                CASE 
+                    WHEN LENGTH(data_inversa) >= 10 THEN SUBSTR(data_inversa, 1, 4)
+                    ELSE data_inversa 
+                END as ano_analise,
+                ROUND(COUNT(CASE WHEN {coluna_critica} IS NULL OR {coluna_critica} = '' OR {coluna_critica} = 'NA' THEN 1 END) * 100.0 / COUNT(*), 2) as percentual_nulo
+            FROM v_prf_bruto
+            GROUP BY ano_analise
+            ORDER BY ano_analise;
+        """).df()
+        
+        # Formata a coluna com o sinal de % antes de exibir
+        padrao_temporal['percentual_nulo'] = padrao_temporal['percentual_nulo'].map('{:.2f}%'.format)
+        display(padrao_temporal.set_index('ano_analise'))
+        
+        # B. Padrão Categórico: Distribuição por Estado (UF)
+        if 'uf' in colunas_disponiveis:
+            print("\n📍 Distribuição de Ausências por UF (%):")
+            padrao_uf = con.execute(f"""
+                SELECT 
+                    uf,
+                    ROUND(COUNT(CASE WHEN {coluna_critica} IS NULL OR {coluna_critica} = '' OR {coluna_critica} = 'NA' THEN 1 END) * 100.0 / COUNT(*), 2) as percentual_nulo
+                FROM v_prf_bruto
+                GROUP BY uf
+                ORDER BY percentual_nulo DESC;
+            """).df()
+            
+            # Formata a coluna com o sinal de % antes de exibir
+            padrao_uf['percentual_nulo'] = padrao_uf['percentual_nulo'].map('{:.2f}%'.format)
+            display(padrao_uf.set_index('uf'))
+            
+    else:
+        print("\n✨ Excelente! Nenhuma coluna de negócio possui valores nulos nativos no dataset bruto.")
+
 else:
-    print("\n✨ Excelente! Nenhuma coluna possui valores nulos nativos no DataFrame.")
+    print(f"❌ Erro: Nenhum arquivo bruto foi localizado em {RAW_DIR}")
 ```
 
-📝 Conclusão da Equipe (Completude): A análise da dimensão de Completude revelou uma excelente qualidade nos dados brutos da Polícia Rodoviária Federal (PRF). As variáveis estruturais e de governança administrativa apresentam índices marginais de omissão, afetando apenas $0,08\%$ dos registros em uop, $0,04\%$ em delegacia e $0,01\%$ em regional, enquanto a variável de classificacao_acidente possui índice estatisticamente nulo. Além disso, a investigação diagnóstica indicou a ausência de padrões temporais ou categóricos nessas omissões; as falhas residuais distribuem-se de forma homogênea ao longo de todo o horizonte temporal avaliado (2021 a 2025) e entre as diferentes Unidades da Federação, evidenciando que a base de dados consolidada preserva integridade e robustez ideais para as etapas subsequentes de modelagem sem a necessidade de intervenções críticas de imputação.
+📝 Conclusão da Equipe (Completude): A dimensão de Completude e Granularidade revelou que a base bruta possui 2.702.004 registros, operando em uma estrutura onde cada acidente envolve, em média, 7,89 linhas, o que confirma a orientação do dataset ao indivíduo. Contudo, os volumes máximos alarmantes de repetição para o ID da Pessoa (263.997) e do Veículo (94.472) indicam o uso massivo de máscaras textuais genéricas (como "0" ou "NÃO IDENTIFICADO") para tratar registros sem identificação clara na ponta. No aspecto de dados ausentes, a variável idade consolidou-se como o campo de negócio mais crítico, apresentando uma taxa crônica de 18,52% de nulos que se mantém estável temporalmente (flutuando na faixa dos 18% entre 2021 e 2025), mas que exibe uma severa assimetria geográfica, concentrando as maiores falhas de preenchimento em estados como Mato Grosso (31,26%) e Pará (29,94%). Adicionalmente, detectou-se um comportamento de omissão em bloco (9,77% de nulos idênticos) para variáveis físicas e de gravidade (sexo, estado_fisico, mortos, feridos), evidenciando um padrão de ausência não-aleatório que desafia a integridade estatística e exige tratamento prioritário na etapa de transformação.
 
 # 2. Dimensão: Consistência
 **Objetivo:** Verificar contradições internas na base de dados.
 
 ```{python}
+import duckdb
 import os
 import pandas as pd
 from pathlib import Path
 
-print("🛡️ Iniciando Testes de Consistência Interna...\n")
+print("🛡️ Iniciando Testes de Consistência Interna com DuckDB (Versão Corrigida)...\n")
 
-# =====================================================================
-# PARTE 2.1: Validação de Regras de Negócio Tradicionais
-# =====================================================================
-colunas_numericas = ['mortos', 'feridos_leves', 'feridos_graves', 'ilesos', 'ignorados', 'veiculos', 'pessoas']
-
-if all(c in df.columns for c in colunas_numericas):
-    
-    # Check A: Valores negativos onde não deveria haver
-    condicao_negativo = False
-    for col in colunas_numericas:
-        condicao_negativo |= (df[col] < 0)
-    negativos = df[condicao_negativo]
-    print(f"❌ Regra 1: Registros com valores numéricos negativos: {len(negativos)}")
-
-    # Check B: Vítimas sem veículos
-    sem_veiculo = df[(df['veiculos'] == 0) & ((df['mortos'] > 0) | (df['feridos_leves'] > 0) | (df['feridos_graves'] > 0))]
-    print(f"❌ Regra 2: Acidentes com vítimas mas zero veículos envolvidos: {len(sem_veiculo)}")
-
-    # Check C: Consistência na Matemática de Vítimas (Soma dos componentes vs Total)
-    if 'feridos' in df.columns:
-        soma_feridos_incorreta = df[df['feridos_leves'] + df['feridos_graves'] != df['feridos']]
-        print(f"❌ Regra 3: Incoerência na soma de feridos (Leves + Graves != Total): {len(soma_feridos_incorreta)}")
-    
-    # Total de pessoas deve ser a soma de todas as categorias de estado físico
-    soma_total_incorreta = df[
-        (df['mortos'] + df['feridos_leves'] + df['feridos_graves'] + df['ilesos'] + df['ignorados']) != df['pessoas']
-    ]
-    print(f"❌ Regra 4: Incoerência na soma total de pessoas (Categorias != Campo Pessoas): {len(soma_total_incorreta)}")
-
-    # Check D: Consistência Textual vs Numérica (Classificação do Acidente)
-    if 'classificacao_acidente' in df.columns:
-        classe_clean = df['classificacao_acidente'].astype(str).str.lower()
-        
-        # Contradição: Diz que é com vítimas mortas, mas contagem de mortos é zero
-        mortos_contraditorios = df[(classe_clean.str.contains('morta')) & (df['mortos'] == 0)]
-        # Contradição: Diz que é sem vítimas, mas tem contagem de feridos ou mortos
-        sem_vitima_contraditorio = df[(classe_clean.str.contains('sem vít')) & ((df['mortos'] > 0) | (df['feridos_leves'] > 0) | (df['feridos_graves'] > 0))]
-        
-        print(f"❌ Regra 5: Contradição em 'Com Vítimas Mortas' mas com zero mortos no contador: {len(mortos_contraditorios)}")
-        print(f"❌ Regra 6: Contradição em 'Sem Vítimas' mas registrando feridos/mortos: {len(sem_vitima_contraditorio)}")
-
-    # Check E: Consistência Geográfica básica (Coordenadas zeradas/nulas fora do padrão)
-    if 'latitude' in df.columns and 'longitude' in df.columns:
-        coordenadas_invalidas = df[(df['latitude'] == 0) | (df['longitude'] == 0)]
-        print(f"❌ Regra 7: Registros com coordenadas de GPS zeradas (inconsistência de localização): {len(coordenadas_invalidas)}")
-
-else:
-    print("⚠️ Erro: Algumas das colunas numéricas necessárias para a validação estão ausentes.")
-
-
-# =====================================================================
-# PARTE 2.2: Diagnóstico Avançado de Granularidade (Via Parquet de Lookup)
-# =====================================================================
-print("\n🕵️ Cruzando metadados de frotas com a tabela de Lookup...")
-
-# Caminho para o arquivo gerado pelo ingest
+# 1. Configuração de caminhos dinâmicos
 PROJECT_ROOT = Path(os.getcwd()).resolve().parent
-LOOKUP_FILE = PROJECT_ROOT / "data" / "raw" / "lookup_testemunhas.parquet"
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
 
-if LOOKUP_FILE.exists():
-    df_lookup = pd.read_parquet(LOOKUP_FILE)
+arquivos_csv = list(RAW_DIR.glob("prf_191_*.csv"))
+
+if arquivos_csv:
+    PATH_CSV_BRUTO = arquivos_csv[-1]
+    con = duckdb.connect(database=':memory:')
     
-    if 'veiculos_reais' in df_lookup.columns:
-        # Cruza a base da EDA com a tabela auxiliar do ingest
-        df_diagnostico = df.merge(df_lookup[['id', 'veiculos_reais']], on='id', how='left')
-        df_diagnostico['veiculos_reais'] = df_diagnostico['veiculos_reais'].fillna(df_diagnostico['veiculos']).astype(int)
-        
-        # Filtra onde a divergência acontece
-        df_inflacionado = df_diagnostico[df_diagnostico['veiculos'] > df_diagnostico['veiculos_reais']]
-        
-        # Calcula os volumes totais das colunas para comparação macro
-        total_veiculos_originais = df_diagnostico['veiculos'].sum()
-        total_veiculos_reais = df_diagnostico['veiculos_reais'].sum()
-        
-        print(f"\n🚨 Alerta de Consistência Relacional:")
-        print(f"   - Total de veículos declarados originalmente: {total_veiculos_originais:,}".replace(',', '.'))
-        print(f"   - Total de veículos reais recalculados (Únicos): {total_veiculos_reais:,}".replace(',', '.'))
-        print(f"   - Total de acidentes com contagem de veículos inflacionada: {len(df_inflacionado):,}".replace(',', '.'))
-        print(f"   - Impacto percentual verificado na base: {(len(df_inflacionado) / len(df)) * 100:.2f}% dos acidentes.")
+    # Cria a view mestre no DuckDB
+    con.execute(f"""
+        CREATE OR REPLACE VIEW v_prf_bruto AS 
+        SELECT * FROM read_csv_auto('{PATH_CSV_BRUTO}', delim=';', encoding='latin-1', all_varchar=True);
+    """)
+    
+    # Detecta as colunas disponíveis na base
+    colunas_disponiveis = [col[0] for col in con.execute("DESCRIBE v_prf_bruto;").fetchall()]
+    
+    # Mapeia dinamicamente os nomes exatos das colunas numéricas de gravidade
+    col_mortos = 'mortos' if 'mortos' in colunas_disponiveis else None
+    col_f_leves = 'feridos_leves' if 'feridos_leves' in colunas_disponiveis else None
+    col_f_graves = 'feridos_graves' if 'feridos_graves' in colunas_disponiveis else None
+    col_ilesos = 'ilesos' if 'ilesos' in colunas_disponiveis else None
+    col_ignorados = 'ignorados' if 'ignorados' in colunas_disponiveis else None
+    col_pessoas = 'pessoas' if 'pessoas' in colunas_disponiveis else None
+    col_feridos = 'feridos' if 'feridos' in colunas_disponiveis else None
+
+    # =====================================================================
+    # PARTE 1: CONSTRUÇÃO DA VIEW DE SANITIZAÇÃO (Casting Defensivo)
+    # =====================================================================
+    def cast_inteiro(coluna):
+        if coluna and coluna in colunas_disponiveis:
+            return f"COALESCE(TRY_CAST({coluna} AS INTEGER), 0)"
+        return "0"
+
+    con.execute(f"""
+        CREATE OR REPLACE VIEW v_consistencia_sanitizada AS
+        SELECT 
+            *,
+            LOWER(CAST(COALESCE(classificacao_acidente, '') AS VARCHAR)) as classe_clean,
+            TRY_CAST(latitude AS DOUBLE) as lat_num,
+            TRY_CAST(longitude AS DOUBLE) as lon_num,
+            {cast_inteiro(col_mortos)} as n_mortos,
+            {cast_inteiro(col_f_leves)} as n_f_leves,
+            {cast_inteiro(col_f_graves)} as n_f_graves,
+            {cast_inteiro(col_ilesos)} as n_ilesos,
+            {cast_inteiro(col_ignorados)} as n_ignorados,
+            {cast_inteiro(col_pessoas)} as n_pessoas,
+            {cast_inteiro(col_feridos)} as n_feridos
+        FROM v_prf_bruto;
+    """)
+
+    # =====================================================================
+    # PARTE 2: EXECUÇÃO DAS REGRAS DE CONSISTÊNCIA
+    # =====================================================================
+    print("📊 [Resultados da Auditoria] Incoerências detectadas na base:")
+
+    # Regra 1: Valores numéricos negativos
+    r1 = con.execute("""
+        SELECT COUNT(*) FROM v_consistencia_sanitizada 
+        WHERE n_mortos < 0 OR n_f_leves < 0 OR n_f_graves < 0 OR n_ilesos < 0 
+           OR n_ignorados < 0 OR n_pessoas < 0;
+    """).fetchone()[0]
+    print(f"   ❌ Regra 1: Registros com valores numéricos negativos: {r1:,}".replace(',', '.'))
+
+    # Regra 2: Vítimas sem associação a um ID de Veículo Válido
+    r2 = con.execute("""
+        SELECT COUNT(*) FROM v_consistencia_sanitizada 
+        WHERE (id_veiculo IS NULL OR id_veiculo = '' OR id_veiculo = '0' OR id_veiculo = 'NA') 
+          AND (n_mortos > 0 OR n_f_leves > 0 OR n_f_graves > 0);
+    """).fetchone()[0]
+    print(f"   ❌ Regra 2: Vítimas registradas sem associação a um veículo (id_veiculo ausente/zerado): {r2:,}".replace(',', '.'))
+
+    # Regra 3: Consistência na Matemática de Feridos (Leves + Graves != Total)
+    if col_feridos:
+        r3 = con.execute("""
+            SELECT COUNT(*) FROM v_consistencia_sanitizada 
+            WHERE (n_f_leves + n_f_graves) != n_feridos;
+        """).fetchone()[0]
+        print(f"   ❌ Regra 3: Incoerência na soma de feridos (Leves + Graves != Total): {r3:,}".replace(',', '.'))
     else:
-        print("⚠️ A coluna 'veiculos_reais' ainda não existe no arquivo Parquet.")
+        print("   🔹 Regra 3: Ignorada (Coluna macro 'feridos' não existe neste layout).")
+
+    # Regra 4: Consistência na Matemática Total de Pessoas (Soma dos componentes != Campo Pessoas)
+    r4 = con.execute("""
+        SELECT COUNT(*) FROM v_consistencia_sanitizada 
+        WHERE (n_mortos + n_f_leves + n_f_graves + n_ilesos + n_ignorados) != n_pessoas;
+    """).fetchone()[0]
+    print(f"   ❌ Regra 4: Incoerência na soma total de pessoas (Categorias != Campo Pessoas): {r4:,}".replace(',', '.'))
+
+    # Regra 5: Contradição Textual - Classificação diz "Com Vítimas Mortas" mas contador de mortos é zero
+    r5 = con.execute("""
+        SELECT COUNT(*) FROM v_consistencia_sanitizada 
+        WHERE classe_clean LIKE '%morta%' AND n_mortos = 0;
+    """).fetchone()[0]
+    print(f"   ❌ Regra 5: Contradição em 'Com Vítimas Mortas' mas com zero mortos no contador: {r5:,}".replace(',', '.'))
+
+    # Regra 6: Contradição Textual - Classificação diz "Sem Vítimas" mas registra feridos/mortos
+    r6 = con.execute("""
+        SELECT COUNT(*) FROM v_consistencia_sanitizada 
+        WHERE (classe_clean LIKE '%sem vít%' OR classe_clean LIKE '%sem vit%') 
+          AND (n_mortos > 0 OR n_f_leves > 0 OR n_f_graves > 0);
+    """).fetchone()[0]
+    print(f"   ❌ Regra 6: Contradição em 'Sem Vítimas' mas registrando feridos/mortos: {r6:,}".replace(',', '.'))
+
+    # Regra 7: Consistência Geográfica (Coordenadas zeradas ou fora do padrão do território brasileiro)
+    r7 = con.execute("""
+        SELECT COUNT(*) FROM v_consistencia_sanitizada 
+        WHERE lat_num = 0.0 OR lon_num = 0.0 
+           OR lat_num > 6.0 OR lat_num < -34.0 
+           OR lon_num > -34.0 OR lon_num < -74.0;
+    """).fetchone()[0]
+    print(f"   ❌ Regra 7: Registros com coordenadas de GPS inválidas ou fora do Brasil: {r7:,}".replace(',', '.'))
+
 else:
-    print("⚠️ Arquivo de lookup não encontrado para cruzamento de granularidade na EDA.")
+    print(f"❌ Erro: Nenhum arquivo bruto foi localizado em {RAW_DIR}")
   ```
 
-📝 Conclusão da Equipe (Consistência):A análise da dimensão de Consistência Interna atestou a conformidade básica das contagens absolutas da base da Polícia Rodoviária Federal (PRF) quanto à ausência de valores numéricos negativos e à validação lógica de coordenadas geográficas e classificações textuais, mas disparou alertas críticos sobre as regras de negócio agregadas e a granularidade relacional dos dados. Além das incoerências matemáticas identificadas na soma de variáveis de estado físico de pessoas (11.236 registros), o diagnóstico avançado de cruzamento com os metadados de envolvidos revelou uma inflação estrutural crônica no campo original de frotas. Enquanto o dataset original contabilizava um macroacúmulo de 680.628 veículos, a recontagem por chaves de identificação única reduziu esse indicador para 653.128 frotas reais, evidenciando que o sistema de origem computa linhas duplicadas de um mesmo veículo quando há múltiplos ocupantes associados a ele. Essa anomalia de agregação, que distorce a volumetria de 27.500 sinistros (representando 8.03% da base), foi formalmente catalogada e qualificada como alvo de tratamento prioritário, servindo de insumo definitivo para a engenharia de recontagem implementada no pipeline de transformação (transform.py).
-
+📝 Conclusão da Equipe (Consistência):Os resultados da auditoria de Consistência Interna revelaram distorções massivas e sistêmicas na base bruta que expõem a incompatibilidade de aplicar regras relacionais tradicionais diretamente em um dataset orientado ao indivíduo. A ausência de registros negativos (Regra 1) e de contradições textuais na classificação do acidente (Regras 5 e 6), aliada ao número irrisório de coordenadas de GPS inválidas ou fora do território nacional (Regra 7: apenas 34 casos), atesta que os dados individuais inseridos possuem boa integridade isolada. No entanto, o colapso lógico ocorre nas validações agregadas: a identificação de 1.273.410 acidentes com vítimas mas zero veículos (Regra 2) e 2.272.211 inconsistências na soma total de pessoas (Regra 4) não indica necessariamente erros de digitação dos agentes da PRF, mas sim um reflexo direto da granularidade da base. Como o arquivo bruto repete as linhas para cada pessoa envolvida e herda colunas de contadores macro (como o total de veículos e pessoas daquela ocorrência), a soma simples desses campos em todas as linhas gera um efeito multiplicador inflacionário artificial, exigindo que a etapa de transformação trate essas variáveis de forma contextualizada ou faça a normalização das tabelas para evitar análises duplicadas na Trusted.
 
 # 3. Dimensão: Acurácia
 **Objetivo:** Verificar se os valores existentes fazem sentido, analisar a tipagem correta e detetar outliers.
 
 ```{python}
-
+import duckdb
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from pathlib import Path
 
-print("🎯 Iniciando Testes de Acurácia dos Dados...\n")
+print("🎯 Iniciando Testes de Acurácia dos Dados com DuckDB...\n")
 
-# 3.1 Validação de Domínio (Correção do Bug Crítico de Caixa Alta/Baixa)
-if 'uf' in df.columns:
-    lista_ufs_validas = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-                         'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN',
-                         'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO']
+# 1. Configuração de caminhos dinâmicos
+PROJECT_ROOT = Path(os.getcwd()).resolve().parent
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+
+arquivos_csv = list(RAW_DIR.glob("prf_191_*.csv"))
+
+if arquivos_csv:
+    PATH_CSV_BRUTO = arquivos_csv[-1]
+    con = duckdb.connect(database=':memory:')
     
-    # Aplicamos .str.upper() e .str.strip() para garantir uma comparação justa
-    uf_normalizada = df['uf'].astype(str).str.upper().str.strip()
-    ufs_invalidas = df[~uf_normalizada.isin(lista_ufs_validas)]
-    print(f"✅ Regra 1: Registros com UF fora do domínio nacional: {len(ufs_invalidas)}")
-    if len(ufs_invalidas) > 0:
-        print(f"   ⚠️ UFs estranhas encontradas: {ufs_invalidas['uf'].unique()}")
-
-# 3.2 Consistência Qualitativa de Categorias (Busca por divergências de grafia)
-categorias_criticas = ['causa_acidente', 'condicao_metereologica', 'fase_dia', 'classificacao_acidente']
-print("\n🔍 Regra 2: Verificando cardinalidade e domínios textuais:")
-for col in categorias_criticas:
-    if col in df.columns:
-        qtd_categorias = df[col].nunique()
-        print(f"   - A coluna '{col}' possui {qtd_categorias} categorias exclusivas.")
-
-# 3.3 Análise Avançada de Outliers Relativos (Proporções entre Vítimas)
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-print("📈 Regra 3: Análise Estatística de Limites e Proporções (Método IQR):\n")
-
-# --- PARTE A: Outliers Isolados (Pessoas e Veículos) ---
-metricas_gerais = ['pessoas', 'veiculos']
-metricas_existentes = [c for c in metricas_gerais if c in df.columns]
-
-# --- PARTE B: Outliers de Proporção Relativa por Acidente ---
-# Criamos um DataFrame auxiliar focado apenas em acidentes com alguma vítima para as razões
-df_vitimas = df[(df['mortos'] > 0) | (df['feridos_graves'] > 0) | (df['feridos_leves'] > 0)].copy()
-
-if not df_vitimas.empty:
-    df_vitimas['razao_mortos_leves'] = np.where(df_vitimas['feridos_leves'] > 0, df_vitimas['mortos'] / df_vitimas['feridos_leves'], np.nan)
-    df_vitimas['razao_mortos_graves'] = np.where(df_vitimas['feridos_graves'] > 0, df_vitimas['mortos'] / df_vitimas['feridos_graves'], np.nan)
-    df_vitimas['razao_graves_leves'] = np.where(df_vitimas['feridos_leves'] > 0, df_vitimas['feridos_graves'] / df_vitimas['feridos_leves'], np.nan)
-
-colunas_proporcao = ['razao_mortos_leves', 'razao_mortos_graves', 'razao_graves_leves']
-titulos_proporcao = ['Mortos / Feridos Leves', 'Mortos / Feridos Graves', 'Feridos Graves / Feridos Leves']
-
-# --- CONFIGURAÇÃO DO PLOT UNIFICADO (5 Gráficos em Linha) ---
-fig, axes = plt.subplots(1, 5, figsize=(22, 5))
-
-# 1. Plotando as Métricas Gerais (Escala Isolada)
-for i, col in enumerate(metricas_existentes):
-    Q1 = df[col].quantile(0.25)
-    Q3 = df[col].quantile(0.75)
-    IQR = Q3 - Q1
-    limite_superior = Q3 + 3.0 * IQR
-    outliers_extremos = df[df[col] > limite_superior]
+    # Cria a view mestre
+    con.execute(f"""
+        CREATE OR REPLACE VIEW v_prf_bruto AS 
+        SELECT * FROM read_csv_auto('{PATH_CSV_BRUTO}', delim=';', encoding='latin-1', all_varchar=True);
+    """)
     
-    print(f"   - Volumetria '{col}': Limite lógico até {int(limite_superior)}. Outliers: {len(outliers_extremos)} registros.")
-    
-    sns.boxplot(y=df[col], ax=axes[i], color='#4C72B0')
-    axes[i].set_title(f'Outliers em:\n{col.capitalize()}')
-    axes[i].set_ylabel('')
+    colunas_disponiveis = [col[0] for col in con.execute("DESCRIBE v_prf_bruto;").fetchall()]
 
-# 2. Plotando os Ratios de Proporção Relativa
-for j, col in enumerate(colunas_proporcao):
-    idx_ax = len(metricas_existentes) + j
-    dados_validos = df_vitimas[col].dropna()
+    # =====================================================================
+    # 3.1 VALIDAÇÃO DE DOMÍNIO (Unidades da Federação)
+    # =====================================================================
+    if 'uf' in colunas_disponiveis:
+        lista_ufs_validas = "('AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', " \
+                            "'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', " \
+                            "'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO')"
+        
+        # Filtra registros com UFs inválidas limpando espaços e forçando caixa alta
+        ufs_invalidas_df = con.execute(f"""
+            SELECT uf, COUNT(*) as qtd 
+            FROM v_prf_bruto 
+            WHERE UPPER(TRIM(uf)) NOT IN {lista_ufs_validas}
+            GROUP BY uf;
+        """).df()
+        
+        total_invalidas = ufs_invalidas_df['qtd'].sum()
+        print(f"✅ Regra 1: Registros com UF fora do domínio nacional: {total_invalidas}")
+        if total_invalidas > 0:
+            print(f"   ⚠️ UFs estranhas encontradas no dataset bruto: {ufs_invalidas_df['uf'].unique()}")
+
+    # =====================================================================
+    # 3.2 CONSISTÊNCIA QUALITATIVA DE CATEGORIAS (Cardinalidade)
+    # =====================================================================
+    # Mapeia as colunas do seu layout (ajustado de condicao_metereologica para condicao_meteorologica se necessário)
+    col_meteo = 'condicao_meteorologica' if 'condicao_meteorologica' in colunas_disponiveis else ('condicao_metereologica' if 'condicao_metereologica' in colunas_disponiveis else None)
     
-    if not dados_validos.empty:
-        Q1 = dados_validos.quantile(0.25)
-        Q3 = dados_validos.quantile(0.75)
+    categorias_criticas = {
+        'causa_acidente': 'causa_acidente',
+        'condicao_meteorologica': col_meteo,
+        'fase_dia': 'fase_dia' if 'fase_dia' in colunas_disponiveis else None,
+        'classificacao_acidente': 'classificacao_acidente' if 'classificacao_acidente' in colunas_disponiveis else None
+    }
+    
+    print("\n🔍 Regra 2: Verificando cardinalidade e domínios textuais nas variáveis de negócio:")
+    for nome_exibicao, col_real in categorias_criticas.items():
+        if col_real:
+            qtd_categorias = con.execute(f"SELECT COUNT(DISTINCT {col_real}) FROM v_prf_bruto;").fetchone()[0]
+            print(f"   - A coluna '{nome_exibicao}' possui {qtd_categorias} categorias exclusivas (grafias únicas).")
+
+    # =====================================================================
+    # 3.3 ANÁLISE AVANÇADA DE OUTLIERS (Agrupada por Acidente via DuckDB)
+    # =====================================================================
+    print("\n📈 Regra 3: Análise Estatística de Limites e Proporções (Método IQR):\n")
+    
+    # Como as colunas de contagem de gravidade estão no nível da pessoa, nós agrupamos por ID do acidente 
+    # para descobrir o volume REAL de envolvidos por ocorrência sem inflação.
+    df_acidentes_agrupados = con.execute("""
+        SELECT 
+            id,
+            COUNT(DISTINCT pesid) as total_pessoas_real,
+            COUNT(DISTINCT id_veiculo) as total_veiculos_real,
+            SUM(COALESCE(TRY_CAST(mortos AS INTEGER), 0)) as total_mortos,
+            SUM(COALESCE(TRY_CAST(feridos_graves AS INTEGER), 0)) as total_graves,
+            SUM(COALESCE(TRY_CAST(feridos_leves AS INTEGER), 0)) as total_leves
+        FROM v_prf_bruto
+        GROUP BY id;
+    """).df()
+
+    # Cálculo dos limites lógicos (IQR Extremas: Q3 + 3*IQR) para Métricas Gerais
+    metricas_reais = ['total_pessoas_real', 'total_veiculos_real']
+    titulos_gerais = ['Pessoas Reais por Ocorrência', 'Veículos Reais por Ocorrência']
+    
+    # Criamos as razões de proporção apenas para acidentes que possuem alguma vítima (evitando divisão por zero)
+    df_vitimas = df_acidentes_agrupados[(df_acidentes_agrupados['total_mortos'] > 0) | 
+                                        (df_acidentes_agrupados['total_graves'] > 0) | 
+                                        (df_acidentes_agrupados['total_leves'] > 0)].copy()
+
+    df_vitimas['razao_mortos_leves'] = np.where(df_vitimas['total_leves'] > 0, df_vitimas['total_mortos'] / df_vitimas['total_leves'], np.nan)
+    df_vitimas['razao_mortos_graves'] = np.where(df_vitimas['total_graves'] > 0, df_vitimas['total_mortos'] / df_vitimas['total_graves'], np.nan)
+    df_vitimas['razao_graves_leves'] = np.where(df_vitimas['total_leves'] > 0, df_vitimas['total_graves'] / df_vitimas['total_leves'], np.nan)
+
+    colunas_proporcao = ['razao_mortos_leves', 'razao_mortos_graves', 'razao_graves_leves']
+    titulos_proporcao = ['Razão Mortos / F. Leves', 'Razão Mortos / F. Graves', 'Razão F. Graves / F. Leves']
+
+    # --- PLOT UNIFICADO (5 Boxplots) ---
+    fig, axes = plt.subplots(1, 5, figsize=(24, 5))
+
+    # 1. Plot e cálculo de Outliers para as Métricas Gerais Recalculadas
+    for i, col in enumerate(metricas_reais):
+        Q1 = df_acidentes_agrupados[col].quantile(0.25)
+        Q3 = df_acidentes_agrupados[col].quantile(0.75)
         IQR = Q3 - Q1
-        limite_sup_prop = Q3 + 3.0 * IQR
-        outliers_proporcao = df_vitimas[df_vitimas[col] > limite_sup_prop]
+        limite_superior = Q3 + 3.0 * IQR
+        outliers_extremos = df_acidentes_agrupados[df_acidentes_agrupados[col] > limite_superior]
         
-        print(f"   - Razão '{titulos_proporcao[j]}': Limite de proporção até {limite_sup_prop:.2f}. Outliers: {len(outliers_proporcao)} registros.")
+        print(f"   - Volumetria '{titulos_gerais[i]}': Limite estável até {int(limite_superior)}. Outliers Extremos: {len(outliers_extremos)} acidentes.")
         
-        sns.boxplot(y=df_vitimas[col], ax=axes[idx_ax], color='#E15759')
-        axes[idx_ax].set_title(f'Proporção:\n{titulos_proporcao[j]}')
-        axes[idx_ax].set_ylabel('')
-    else:
-        axes[idx_ax].text(0.5, 0.5, 'Sem dados', ha='center', va='center')
+        sns.boxplot(y=df_acidentes_agrupados[col], ax=axes[i], color='#4C72B0')
+        axes[i].set_title(f'{titulos_gerais[i]}')
+        axes[i].set_ylabel('')
 
-plt.tight_layout()
-plt.show()
+    # 2. Plot e cálculo de Outliers para as Razões de Gravidade
+    for j, col in enumerate(colunas_proporcao):
+        idx_ax = len(metricas_reais) + j
+        dados_validos = df_vitimas[col].dropna()
+        
+        if not dados_validos.empty:
+            Q1 = dados_validos.quantile(0.25)
+            Q3 = dados_validos.quantile(0.75)
+            IQR = Q3 - Q1
+            limite_sup_prop = Q3 + 3.0 * IQR
+            outliers_proporcao = df_vitimas[df_vitimas[col] > limite_sup_prop]
+            
+            print(f"   - Proporção '{titulos_proporcao[j]}': Limite estável até {limite_sup_prop:.2f}. Outliers Extremos: {len(outliers_proporcao)} acidentes.")
+            
+            sns.boxplot(y=df_vitimas[col], ax=axes[idx_ax], color='#E15759')
+            axes[idx_ax].set_title(f'{titulos_proporcao[j]}')
+            axes[idx_ax].set_ylabel('')
+        else:
+            axes[idx_ax].text(0.5, 0.5, 'Sem dados válidos', ha='center', va='center')
+
+    plt.tight_layout()
+    plt.show()
+
+else:
+    print(f"❌ Erro: Nenhum arquivo bruto foi localizado em {RAW_DIR}")
   ```
 
-📝 Conclusão da Equipe (Acurácia): A análise da dimensão de Acurácia confirmou a conformidade dos dados consolidados da Polícia Rodoviária Federal (PRF), com a validação de domínio para uf indicando zero não-conformidades e a cardinalidade categórica atestando a padronização das variáveis textuais. No ecossistema numérico, o diagnóstico estruturado por Intervalo Interquartil ($3 \times IQR$) expandiu o mapeamento de anomalias sob duas perspectivas complementares: a análise univariada isolou os limites típicos de magnitude dos sinistros (identificando volumes de cauda longa para ocorrências acima de 5 pessoas e 5 veículos), enquanto a análise bivariada cruzou as dinâmicas de letalidade e severidade física por evento. O cálculo estatístico das razões de proporcionalidade interna (Mortos / Feridos e Graves / Leves) permitiu delimitar o comportamento esperado de fragmentação das forças de impacto, isolando os acidentes cujas taxas de letalidade relativa destoam da distribuição histórica e qualificando a base como acurada e livre de ruídos espúrios induzidos por erros de digitação.
-
-
+📝 Conclusão da Equipe (Acurácia): A dimensão de Acurácia, auditada com precisão analítica via DuckDB ao nível agregado do acidente, atestou a integridade categórica do dataset com zero registros de UFs inválidas (Regra 1) e uma cardinalidade textual controlada para variáveis críticas de negócio (Regra 2), mapeando 77 causas exclusivas, 10 condições meteorológicas e 4 classificações de severidade. Contudo, a modelagem estatística por limites pelo método IQR de Extremos (Regra 3) revelou assimetrias severas e comportamentos de cauda longa típicos de grandes desastres logísticos rodoviários: o limite estável estabeleceu o teto estatístico de até 6 pessoas e 5 veículos reais por ocorrência, classificando 7.949 e 4.279 acidentes como outliers volumétricos, respectivamente. O fenômeno mais crítico manifestou-se nos gráficos de caixas das razões de proporção de severidade (Mortos e Feridos), cujos limites estáveis convergiram a zero devido ao predomínio massivo de acidentes leves na base, fazendo com que qualquer ocorrência com alta taxa de letalidade imediata gerasse milhares de anomalias estatísticas isoladas (como os 21.030 acidentes identificados na razão de Feridos Graves por Leves), métricas fundamentais que dão embasamento teórico para delimitar o escopo de modelagem preditiva ou normalização na camada trusted.
 # 4. Dimensão: Temporalidade
 **Objetivo:** Avaliar a correção das datas e a existência de lacunas no tempo ou datas futuras.
 
 
 ```{python}
+import duckdb
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+from pathlib import Path
 
-print("📅 Iniciando Testes de Temporalidade...\n")
+print("📅 Iniciando Testes de Temporalidade com DuckDB...\n")
 
-if 'data_inversa' in df.columns:
-    # 1. Parsing Defensivo: Suporta múltiplos formatos automaticamente (ISO e BR)
-    df['data_validada'] = pd.to_datetime(df['data_inversa'], errors='coerce', format='mixed')
+# 1. Configuração de caminhos dinâmicos
+PROJECT_ROOT = Path(os.getcwd()).resolve().parent
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+
+arquivos_csv = list(RAW_DIR.glob("prf_191_*.csv"))
+
+if arquivos_csv:
+    PATH_CSV_BRUTO = arquivos_csv[-1]
+    con = duckdb.connect(database=':memory:')
     
-    datas_invalidas = df['data_validada'].isnull().sum()
-    print(f"❌ Regra 1: Registros com datas corrompidas ou inválidas: {datas_invalidas}")
+    # Cria a view mestre
+    con.execute(f"""
+        CREATE OR REPLACE VIEW v_prf_bruto AS 
+        SELECT * FROM read_csv_auto('{PATH_CSV_BRUTO}', delim=';', encoding='latin-1', all_varchar=True);
+    """)
     
-    if datas_invalidas < len(df):
-        data_min = df['data_validada'].min()
-        data_max = df['data_validada'].max()
-        print(f"⏱️  Regra 2: Cobertura da Série Histórica:")
-        print(f"   - Ponto inicial dos dados: {data_min.strftime('%d/%m/%Y')}")
-        print(f"   - Ponto final dos dados: {data_max.strftime('%d/%m/%Y')}")
+    colunas_disponiveis = [col[0] for col in con.execute("DESCRIBE v_prf_bruto;").fetchall()]
+
+    if 'data_inversa' in colunas_disponiveis:
         
-        # 2. Check de Viagem no Tempo: Registros com datas além do dia de hoje
-        data_limite = pd.Timestamp.now()
-        futuro = df[df['data_validada'] > data_limite]
-        print(f"❌ Regra 3: Registros com datas futuras aberrantes: {len(futuro)}")
-        if len(futuro) > 0:
-            print(f"   ⚠️ Amostra de datas futuras: {futuro['data_inversa'].unique()[:5]}")
+        # =====================================================================
+        # PARTE 1: VIEW COM PARSING DE DATA DEFENSIVO
+        # =====================================================================
+        # O TRY_CAST tenta converter formatos ISO (YYYY-MM-DD) ou BR (DD/MM/YYYY) automaticamente
+        con.execute("""
+            CREATE OR REPLACE VIEW v_temporalidade_validada AS
+            SELECT 
+                *,
+                COALESCE(TRY_CAST(data_inversa AS DATE), strptime(data_inversa, '%d/%m/%Y')::DATE) as data_validada
+            FROM v_prf_bruto;
+        """)
+
+        # Regra 1: Registros com datas corrompidas ou inválidas
+        r1 = con.execute("SELECT COUNT(*) FROM v_temporalidade_validada WHERE data_validada IS NULL;").fetchone()[0]
+        print(f"   ❌ Regra 1: Registros com datas corrompidas ou inválidas: {r1}")
+
+        # Verifica se há dados válidos para continuar as análises temporais
+        total_linhas = con.execute("SELECT COUNT(*) FROM v_temporalidade_validada;").fetchone()[0]
+        
+        if r1 < total_linhas:
+            # Regra 2: Cobertura da Série Histórica
+            datas_limite = con.execute("SELECT MIN(data_validada), MAX(data_validada) FROM v_temporalidade_validada;").fetchone()
+            data_min, data_max = datas_limite[0], datas_limite[1]
             
-        # 3. Investigação de Lacunas (Gaps Críticos):
-        # Agrupa por dia para ver se há algum dia inteiro sem NENHUM acidente registrado no Brasil
-        contagem_diaria = df['data_validada'].value_counts().sort_index()
-        intervalo_completo = pd.date_range(start=data_min, end=data_max, freq='D')
-        dias_zerados = len(intervalo_completo) - len(contagem_diaria)
-        print(f"❌ Regra 4: Dias completos sem nenhum registro na série (Lacunas): {dias_zerados}")
+            print(f"   ⏱️  Regra 2: Cobertura da Série Histórica:")
+            print(f"      - Ponto inicial dos dados: {data_min.strftime('%d/%m/%Y')}")
+            print(f"      - Ponto final dos dados:   {data_max.strftime('%d/%m/%Y')}")
+            
+            # Regra 3: Check de Viagem no Tempo (Datas além do dia de hoje)
+            # Nota: O DuckDB executa a comparação contra a data atual do sistema (CURRENT_DATE)
+            r3_df = con.execute("""
+                SELECT data_inversa, COUNT(*) as qtd 
+                FROM v_temporalidade_validada 
+                WHERE data_validada > CURRENT_DATE
+                GROUP BY data_inversa;
+            """).df()
+            
+            print(f"   ❌ Regra 3: Registros com datas futuras aberrantes: {r3_df['qtd'].sum()}")
+            if len(r3_df) > 0:
+                print(f"      ⚠️ Amostra de datas futuras detectadas: {r3_df['data_inversa'].unique()[:5]}")
 
-        # 4. Gráfico de Tendência e Sazonalidade (Substituindo as barras poluídas por Linha Temporal)
-        df_agrupado = df['data_validada'].dt.to_period('M').value_counts().sort_index()
-        
-        plt.figure(figsize=(12, 4.5))
-        df_agrupado.plot(kind='line', marker='o', color='#2b5c8f', linewidth=2, markersize=4)
-        plt.title('Evolução Mensal do Volume de Acidentes (Série Histórica)', fontsize=12, fontweight='bold')
-        plt.xlabel('Linha do Tempo (Ano-Mês)')
-        plt.ylabel('Quantidade de Ocorrências')
-        plt.grid(True, linestyle='--', alpha=0.6)
-        plt.tight_layout()
-        plt.show()
-        
-    # Limpeza da coluna temporária do notebook
-    df.drop(columns=['data_validada'], errors='ignore', inplace=True)
+            # Regra 4: Investigação de Lacunas (Gaps Críticos por Dias Zerados)
+            # Geramos uma série temporal contínua no SQL e cruzamos com os dias reais do dataset
+            r4 = con.execute(f"""
+                WITH calendario AS (
+                    SELECT CAST(generate_series AS DATE) as dia_calendario
+                    FROM generate_series(CAST('{data_min}' AS DATE), CAST('{data_max}' AS DATE), INTERVAL '1 DAY')
+                ),
+                dados_diarios AS (
+                    SELECT data_validada, COUNT(*) as qtd 
+                    FROM v_temporalidade_validada 
+                    WHERE data_validada IS NOT NULL
+                    GROUP BY data_validada
+                )
+                SELECT COUNT(*) 
+                FROM calendario c
+                LEFT JOIN dados_diarios d ON c.dia_calendario = d.data_validada
+                WHERE d.data_validada IS NULL;
+            """).fetchone()[0]
+            
+            print(f"   ❌ Regra 4: Dias completos sem nenhum registro na série (Lacunas): {r4}")
+
+            # =====================================================================
+            # PARTE 2: AGREGAÇÃO MENSAL E PLOT DA TENDÊNCIA
+            # =====================================================================
+            # Agrupamos por Ano-Mês direto no DuckDB para alimentar o gráfico de forma leve
+            df_tendencia = con.execute("""
+                SELECT 
+                    strftime(data_validada, '%Y-%m') as ano_mes,
+                    COUNT(*) as qtd_ocorrencias
+                FROM v_temporalidade_validada
+                WHERE data_validada IS NOT NULL
+                GROUP BY ano_mes
+                ORDER BY ano_mes;
+            """).df()
+
+            # Renderização do Gráfico de Linha Confiável
+            plt.figure(figsize=(12, 4.5))
+            plt.plot(df_tendencia['ano_mes'], df_tendencia['qtd_ocorrencias'], 
+                     marker='o', color='#2b5c8f', linewidth=2, markersize=4)
+            
+            plt.title('Evolução Mensal do Volume de Acidentes (Série Histórica)', fontsize=12, fontweight='bold')
+            plt.xlabel('Linha do Tempo (Ano-Mês)')
+            plt.ylabel('Quantidade de Ocorrências')
+            
+            # Ajusta os labels do eixo X para não sobrecarregar visualmente
+            ticks_intervalo = max(1, len(df_tendencia) // 12)
+            plt.xticks(df_tendencia['ano_mes'][::ticks_intervalo], rotation=45, ha='right')
+            
+            plt.grid(True, linestyle='--', alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+    else:
+        print("⚠️ Erro: A coluna 'data_inversa' não foi localizada no layout da base.")
 else:
-    print("⚠️ Erro: A coluna 'data_inversa' não foi localizada no DataFrame.")
+    print(f"❌ Erro: Nenhum arquivo bruto foi localizado em {RAW_DIR}")
   ```
 
-  📝 Conclusão da Equipe (Temporalidade): A análise da dimensão de Temporalidade constatou a consistência cronológica e a perfeita sincronização dos dados integrados da Polícia Rodoviária Federal (PRF). O procedimento de parsing defensivo indicou zero registros com formatos inválidos ou corrompidos, delimitando uma série histórica contínua e sem quebras de continuidade. A validação de limites temporais confirmou a inexistência de anomalias relacionadas a datas futuras, enquanto o teste de descontinuidade diária acusou zero lacunas (gaps) na série, comprovando que não existem dias sem monitoramento operacional ao longo do horizonte temporal. Por fim, o mapeamento evolutivo mensal revelou uma distribuição de dados que flutua de forma controlada e previsível, capturando ciclos sazonais legítimos da malha rodoviária federal e qualificando a base como atualizada e íntegra para análises de tendências longitudinais.
+  📝 Conclusão da Equipe (Temporalidade): A dimensão de Temporalidade, validada com o DuckDB, atestou a integridade cronológica absoluta da base de dados bruta ao registrar zero ocorrências de datas corrompidas (Regra 1), zero registros com viagens no tempo em relação ao calendário atual (Regra 3) e zero lacunas diárias (Regra 4) ao longo de toda a série histórica, garantindo uma cobertura ininterrupta de 365 dias por ano. O mapeamento da série (Regra 2) delimitou um intervalo perfeito de cinco anos fechados, iniciando em 01/01/2021 e finalizando em 31/12/2025. Ao analisar o gráfico de evolução mensal gerado a partir do processamento vetorizado, observa-se uma tendência de crescimento estrutural no volume de registros entre 2021 e final de 2024, acompanhada por um padrão de sazonalidade recorrente caracterizado por picos agudos de ocorrências nos meses de dezembro (férias e festividades de fim de ano) seguidos de quedas abruptas nos primeiros meses de cada ano subsequente. Esse comportamento macro perfeitamente delimitado e livre de ruídos de preenchimento valida a qualidade cronológica do ecossistema RAW, indicando que a série temporal está madura e pronta para subsidiar análises preditivas ou modelos de decomposição de tendências na camada trusted.
