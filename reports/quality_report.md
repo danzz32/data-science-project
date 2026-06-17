@@ -1,5 +1,5 @@
 # Relatório de Qualidade de Dados - Camada Trusted (DuckDB Motor)
-**Data de Execução:** 2026-06-07 16:24:19
+**Data de Execução:** 2026-06-17 13:10:19
 **Estratégia Computacional:** Arquitetura Vetorizada de Alta Performance com DuckDB
 
 ## Resumo da Execução (Linhas)
@@ -9,8 +9,8 @@
 
 ## Eficiência de Armazenamento e Compressão 📉
 * **Tamanho do Arquivo Bruto (CSV):** 986.75 MB
-* **Tamanho do Arquivo Otimizado (Parquet Trusted):** 32.67 MB
-* **Ganho de Economia em Disco:** **96.69%** reduzidos com codificação Parquet e Compressão Snappy
+* **Tamanho do Arquivo Otimizado (Parquet Trusted):** 31.53 MB
+* **Ganho de Economia em Disco:** **96.80%** reduzidos com codificação Parquet e Compressão Snappy
 
 ## Detalhamento de Erros de Quarentena
 * **Falhas Críticas de Parsing (ID ou Data Nula):** 0 registros

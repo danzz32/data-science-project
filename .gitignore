@@ -1,53 +1,46 @@
-# ==========================================
-# 1. AMBIENTE VIRTUAL E PYTHON (Zero-Config uv)
-# ==========================================
+# =====================================================================
+# 1. AMBIENTE VIRTUAL, CONFIGURAÇÕES E IDEs
+# =====================================================================
 __pycache__/
 *.py[oc]
 .venv/
 .uv/
 .vulture_ignore
+.vscode/
+.idea/
 
-# ==========================================
-# 2. GOVERNANÇA E SEGURANÇA (Regra de Desclassificação)
-# ==========================================
-# Ignora qualquer vazamento de credencial local
+# =====================================================================
+# 2. SEGURANÇA (Gerenciamento do Ambiente de Ingestão)
+# =====================================================================
 .env
 .env.*
 *.env
-
-# Permite explicitamente o arquivo de exemplo exigido no seu README
 !.env.example
 
-# ==========================================
-# 3. CAMADAS DO DATA LAKE LOCAL (Controle Estrito)
-# ==========================================
-
-# --- CAMADA RAW ---
-data/raw/*.csv
-data/raw/*.zip
-data/raw/*.json
-data/raw/*.txt
-data/raw/*.parquet
+# =====================================================================
+# 3. GOVERNANÇA DO DATA LAKE (Camadas Isoladas e Imutáveis)
+# =====================================================================
+# Camada RAW: Mantém os arquivos de origem anuais intocados
+data/raw/*
 !data/raw/.gitkeep
 
-# --- CAMADA TRUSTED ---
-# Ignora a saída binária de dados gerada pelo transform.py
+# Camada TRUSTED: Armazenamento colunar otimizado
 data/trusted/*.parquet
 !data/trusted/.gitkeep
 
-# --- CAMADA QUARANTINE ---
-# Ignora os arquivos binários de isolamento, mas mantém a pasta
+# Camada QUARANTINE: Isolamento de falhas críticas
 data/quarantine/*.parquet
 !data/quarantine/.gitkeep
 
-# ==========================================
-# 4. EDA E DOCUMENTAÇÃO (Estrutura Exigida)
-# ==========================================
-# Garante que o notebook eda_qualidade.qmd e scripts não sejam ignorados
+# =====================================================================
+# 4. DOCUMENTAÇÃO, QUARTO E ARTEFATOS DE COMPILAÇÃO
+# =====================================================================
 !docs/
 !docs/*.qmd
 !docs/*.ipynb
 
-# Ignora caches locais do Quarto/Jupyter se você renderizar os relatórios
+# Bloqueia arquivos e caches gerados pela renderização do Quarto
+docs/eda_qualidade_files/
+docs/.tmp/
 .markdown-notebook/
 .ipynb_checkpoints/
