@@ -1,21 +1,20 @@
 import os
 import time
+import glob
 import zipfile
 import shutil
 import requests
 import urllib3
 from pathlib import Path
 from datetime import datetime
-from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 
 # Desabilita avisos de certificados TLS/SSL inválidos gerados pelo site do governo
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-load_dotenv()
-MAX_RETRIES = int(os.getenv("INGEST_MAX_RETRIES", 3))
-BACKOFF_FACTOR = int(os.getenv("INGEST_BACKOFF_FACTOR", 2))
-TIMEOUT_HTTP = int(os.getenv("INGEST_TIMEOUT", 30))
+MAX_RETRIES = 3
+BACKOFF_FACTOR = 2
+TIMEOUT_HTTP = 30
 
 class FirefoxTLSAdapter(HTTPAdapter):
     """Adaptador de rede robusto que injeta cifras modernas para contornar restrições severas de SSL."""
@@ -68,17 +67,21 @@ def main():
     RAW_DIR = PROJECT_ROOT / "data" / "raw"
     TEMP_DIR = RAW_DIR / "temp_extraction"
     
-    # Gerando a data da ingestão para o arquivo principal bruto unificado
-    datestamp = datetime.now().strftime("%Y-%m-%d")
-    FINAL_RAW_FILE = RAW_DIR / f"prf_191_{datestamp}.csv"
-
     RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+    # ─── VALIDAÇÃO DE IDEMPOTÊNCIA REAL HISTÓRICA ───
+    # Busca por qualquer arquivo consolidado preexistente no diretório RAW
+    arquivos_existentes = glob.glob(str(RAW_DIR / "prf_191_*.csv"))
     
-    # Idempotência Real: Se o arquivo unificado do dia já existe, para o pipeline aqui
-    if FINAL_RAW_FILE.exists():
-        print(f"⚠️  Atenção: O arquivo bruto consolidado para o dia {datestamp} já existe na RAW.")
-        print("⏭️  Pulando a ingestão para garantir a imutabilidade e evitar downloads redundantes hoje.")
+    if arquivos_existentes:
+        arquivo_original = Path(arquivos_existentes[0])
+        print(f"⚠️  Idempotência Ativada: Base histórica original localizada em '{arquivo_original.name}'.")
+        print("⏭️  Pulando a ingestão para evitar downloads redundantes e desperdício de armazenamento, além de manter a imutabilidade!")
         return
+
+    # Se a pasta estiver vazia, realiza o primeiro download guardando o carimbo de hoje
+    datestamp_hoje = datetime.now().strftime("%Y-%m-%d")
+    FINAL_RAW_FILE = RAW_DIR / f"prf_191_{datestamp_hoje}.csv"
 
     FONTES_OFICIAIS = {
         "2025": "https://arquivos.prf.gov.br/arquivos/index.php/s/w7N1Z69O2gKfehZ/download",
@@ -96,7 +99,7 @@ def main():
         "2021": "https://docs.google.com/uc?export=download&id=1Gk3U6cMOZIevsDZHLi6J503xoCRS_lnI"
     }
 
-    print(f"🚀 Iniciando Sistema Multirrota: Baixando {len(FONTES_OFICIAIS)} anos para consolidação...")
+    print(f"🚀 Base RAW vazia. Iniciando primeiro download do dataset de {len(FONTES_OFICIAIS)} anos...")
     temp_csv_files = []
     relatorio_linhas_por_ano = {}
 
@@ -106,7 +109,6 @@ def main():
         zip_path = TEMP_DIR / f"download_{ano}.zip"
         csv_temp_path = TEMP_DIR / f"raw_{ano}.csv"
         
-        # Tenta Rota Primária (Governo)
         url_alvo = FONTES_OFICIAIS[ano]
         print(f"📥 Conectando à Rota Primária (Portal de Dados Abertos PRF)...")
         try:
@@ -121,7 +123,6 @@ def main():
                 print(f"❌ Falha em ambas as rotas para o ano {ano}: {e_failover}")
                 continue
 
-        # Extração para a pasta temporária
         try:
             print(f"📦 Extraindo conteúdo bruto...")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -140,7 +141,6 @@ def main():
         except Exception as e:
             print(f"❌ Erro no processamento local do ano {ano}: {e}")
 
-    # ─── EMPILHAMENTO E CONSOLIDAÇÃO NO ARQUIVO FINAL COM DATA ───
     if temp_csv_files:
         print("\n--- 📦 Consolidando Dataset Único na Camada RAW ---")
         try:
@@ -158,20 +158,19 @@ def main():
             total_geral = contar_linhas_arquivo(FINAL_RAW_FILE)
 
             print("\n==========================================================")
-            print(f"📊 RELATÓRIO DE VOLUMETRIA CONSOLIDADA - BRUTO ({datestamp})")
+            print(f"📊 RELATÓRIO DE VOLUMETRIA CONSOLIDADA - BRUTO ({datestamp_hoje})")
             print("==========================================================")
             for ano_ref, total_ano in sorted(relatorio_linhas_por_ano.items()):
                 print(f" ──> Série Histórica {ano_ref}: {total_ano:,} linhas.")
             print("──────────────────────────────────────────────────────────")
             print(f" Total Geral Unificado: {total_geral:,} registros empilhados.")
             print("==========================================================")
-            print(f"\n✨ Sucesso! Base unificada salva em: {FINAL_RAW_FILE}")
+            print(f"\n✨ Sucesso! Base original salva em: {FINAL_RAW_FILE}")
             print(f"💾 Tamanho do arquivo final: {FINAL_RAW_FILE.stat().st_size / (1024*1024):.2f} MB")
 
         except Exception as e:
             print(f"❌ Erro na consolidação do arquivo final: {e}")
 
-    # Limpeza absoluta da pasta temporária
     if TEMP_DIR.exists():
         shutil.rmtree(TEMP_DIR)
     print("\n🧹 Pasta temporária limpa. Ingestão Concluída!")
