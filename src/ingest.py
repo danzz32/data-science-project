@@ -1,10 +1,29 @@
 import os
-import shutil
+import time
+import glob
 import zipfile
-import gdown
+import shutil
+import requests
+import urllib3
 from pathlib import Path
 from datetime import datetime
-from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+
+# Desabilita avisos de certificados TLS/SSL inválidos gerados pelo site do governo
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+MAX_RETRIES = 3
+BACKOFF_FACTOR = 2
+TIMEOUT_HTTP = 30
+
+class FirefoxTLSAdapter(HTTPAdapter):
+    """Adaptador de rede robusto que injeta cifras modernas para contornar restrições severas de SSL."""
+    def init_poolmanager(self, *args, **kwargs):
+        context = urllib3.util.ssl_.create_urllib3_context()
+        context.set_ciphers('DEFAULT:@SECLEVEL=1:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256')
+        context.check_hostname = False
+        kwargs['ssl_context'] = context
+        return super(FirefoxTLSAdapter, self).init_poolmanager(*args, **kwargs)
 
 def contar_linhas_arquivo(caminho_arquivo: Path) -> int:
     """Conta de forma eficiente a quantidade de registros sem carregar o arquivo na RAM."""
@@ -12,119 +31,149 @@ def contar_linhas_arquivo(caminho_arquivo: Path) -> int:
     with open(caminho_arquivo, 'r', encoding='latin-1') as f:
         for _ in f:
             linhas += 1
-    # Subtrai 1 para remover o cabeçalho da contagem de registros reais
     return max(0, linhas - 1)
 
-def main():
-    # 1. Carrega as variáveis de ambiente do arquivo .env
-    load_dotenv()
+def download_com_politica_retry(url: str, destino: Path) -> None:
+    """Efetua o download contornando bloqueios de TLS com tratamento exponencial de erro."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3"
+    }
+    
+    for tentativa in range(1, MAX_RETRIES + 1):
+        try:
+            with requests.Session() as session:
+                session.mount("https://", FirefoxTLSAdapter())
+                session.mount("http://", FirefoxTLSAdapter())
+                
+                with session.get(url, headers=headers, stream=True, timeout=TIMEOUT_HTTP, verify=False) as r:
+                    r.raise_for_status()
+                    with open(destino, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=32768):
+                            if chunk:
+                                f.write(chunk)
+            return
+        except Exception as e:
+            tempo_espera = BACKOFF_FACTOR ** tentativa
+            print(f"  ⚠️ [Tentativa {tentativa}/{MAX_RETRIES}] Falha na comunicação TLS/HTTP: {e}")
+            if tentativa == MAX_RETRIES:
+                raise ConnectionError("Servidor indisponível ou rejeitando tráfego Python.")
+            print(f"  🔄 Recuando estrategicamente por {tempo_espera}s...")
+            time.sleep(tempo_espera)
 
-    # 2. Configurações de Pastas e Data
+def main():
     PROJECT_ROOT = Path(__file__).resolve().parent.parent
     RAW_DIR = PROJECT_ROOT / "data" / "raw"
-    TEMP_DIR = RAW_DIR / "temp_extraction" 
+    TEMP_DIR = RAW_DIR / "temp_extraction"
     
-    # Gerando a data da ingestão para o arquivo principal bruto ajustado para o padrão mestre
-    datestamp = datetime.now().strftime("%Y-%m-%d")
-    FINAL_RAW_FILE = RAW_DIR / f"prf_191_{datestamp}.csv"
-
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 3. Check de Idempotência (Garante append-only e evita retrabalho)
-    if FINAL_RAW_FILE.exists():
-        print(f"⚠️  Atenção: O arquivo bruto para o dia {datestamp} já existe na RAW.")
-        print("⏭️  Pulando a ingestão para garantir a imutabilidade do diretório.")
+    # ─── VALIDAÇÃO DE IDEMPOTÊNCIA REAL HISTÓRICA ───
+    # Busca por qualquer arquivo consolidado preexistente no diretório RAW
+    arquivos_existentes = glob.glob(str(RAW_DIR / "prf_191_*.csv"))
+    
+    if arquivos_existentes:
+        arquivo_original = Path(arquivos_existentes[0])
+        print(f"⚠️  Idempotência Ativada: Base histórica original localizada em '{arquivo_original.name}'.")
+        print("⏭️  Pulando a ingestão para evitar downloads redundantes e desperdício de armazenamento, além de manter a imutabilidade!")
         return
 
-    # Só cria a pasta temporária se o processo for realmente rodar
-    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+    # Se a pasta estiver vazia, realiza o primeiro download guardando o carimbo de hoje
+    datestamp_hoje = datetime.now().strftime("%Y-%m-%d")
+    FINAL_RAW_FILE = RAW_DIR / f"prf_191_{datestamp_hoje}.csv"
 
-    # 4. Mapeamento de Anos usando EXCLUSIVAMENTE os IDs do Dataset Geral/Complexo
-    DATA_SOURCES = {
-        "2025": "1-PJGRbfSe7PVjU37A3wTCls_NRXyVGRD",
-        "2024": "14qBOhrE1gioVtuXgxkCJ9kCA8YtUGXKA",  
-        "2023": "1-caam_dahYOf2eorq4mez04Om6DD5d_3", 
-        "2022": "1wskEgRC3ame7rncSDQ7qWhKsoKw1lohY",
-        "2021": "1Gk3U6cMOZIevsDZHLi6J503xoCRS_lnI",
+    FONTES_OFICIAIS = {
+        "2025": "https://arquivos.prf.gov.br/arquivos/index.php/s/w7N1Z69O2gKfehZ/download",
+        "2024": "https://arquivos.prf.gov.br/arquivos/index.php/s/77lY9mshU0D1z4v/download",
+        "2023": "https://arquivos.prf.gov.br/arquivos/index.php/s/76vdf88UhY7z2pZ/download",
+        "2022": "https://arquivos.prf.gov.br/arquivos/index.php/s/6v8y9YVNhU7Z1pW/download",
+        "2021": "https://arquivos.prf.gov.br/arquivos/index.php/s/5V7y8YVNhU6Z1pW/download"
     }
 
-    print(f"🚀 Iniciando download do dataset geral de {len(DATA_SOURCES)} anos...")
+    FONTES_CONTINGENCIA = {
+        "2025": "https://docs.google.com/uc?export=download&id=1-PJGRbfSe7PVjU37A3wTCls_NRXyVGRD",
+        "2024": "https://docs.google.com/uc?export=download&id=14qBOhrE1gioVtuXgxkCJ9kCA8YtUGXKA",
+        "2023": "https://docs.google.com/uc?export=download&id=1-caam_dahYOf2eorq4mez04Om6DD5d_3",
+        "2022": "https://docs.google.com/uc?export=download&id=1wskEgRC3ame7rncSDQ7qWhKsoKw1lohY",
+        "2021": "https://docs.google.com/uc?export=download&id=1Gk3U6cMOZIevsDZHLi6J503xoCRS_lnI"
+    }
 
-    # Lista para controlar os arquivos CSV descompactados temporariamente
+    print(f"🚀 Base RAW vazia. Iniciando primeiro download do dataset de {len(FONTES_OFICIAIS)} anos...")
     temp_csv_files = []
     relatorio_linhas_por_ano = {}
 
-    # 5. Loop de Ingestão de Dados Brutos
-    for ano, id_drive in DATA_SOURCES.items():
+    for ano in sorted(FONTES_OFICIAIS.keys()):
         print(f"\n--- 📅 Processando Ano: {ano} ---")
-        zip_path = TEMP_DIR / f"geral_{ano}.zip"
+        TEMP_DIR.mkdir(parents=True, exist_ok=True)
+        zip_path = TEMP_DIR / f"download_{ano}.zip"
+        csv_temp_path = TEMP_DIR / f"raw_{ano}.csv"
         
+        url_alvo = FONTES_OFICIAIS[ano]
+        print(f"📥 Conectando à Rota Primária (Portal de Dados Abertos PRF)...")
         try:
-            print(f"📥 Baixando arquivo comprimido do ano {ano}...")
-            gdown.download(f"https://drive.google.com/uc?id={id_drive}", str(zip_path), quiet=True)
+            download_com_politica_retry(url_alvo, zip_path)
+        except (ConnectionError, Exception):
+            print(f"⚠️  Alerta de instabilidade no site do Governo para o ano {ano}.")
+            print(f"🔀 Chaveando dinamicamente para a rota de Failover...")
+            url_alvo = FONTES_CONTINGENCIA[ano]
+            try:
+                download_com_politica_retry(url_alvo, zip_path)
+            except Exception as e_failover:
+                print(f"❌ Falha em ambas as rotas para o ano {ano}: {e_failover}")
+                continue
 
+        try:
             print(f"📦 Extraindo conteúdo bruto...")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                csv_original_name = zip_ref.namelist()[0]
-                # Criamos um nome padronizado temporário para evitar conflitos de encoding no file system
-                csv_temp_path = TEMP_DIR / f"raw_{ano}.csv"
+                csv_original = next((arq for arq in zip_ref.namelist() if arq.lower().endswith('.csv')), None)
+                if not csv_original:
+                    raise FileNotFoundError("Nenhum CSV encontrado dentro do zip.")
                 
-                zip_ref.extract(csv_original_name, path=TEMP_DIR)
-                (TEMP_DIR / csv_original_name).rename(csv_temp_path)
+                zip_ref.extract(csv_original, path=TEMP_DIR)
+                shutil.move(str(TEMP_DIR / csv_original), str(csv_temp_path))
                 
-                temp_csv_files.append(csv_temp_path)
-                print(f"✅ Ano {ano} extraído com sucesso.")
-
-                # Realiza a contagem volumétrica do ano corrente de forma otimizada
-                qtd_linhas = contar_linhas_arquivo(csv_temp_path)
-                relatorio_linhas_por_ano[ano] = qtd_linhas
-                print(f"📊 Volumetria Identificada para {ano}: {qtd_linhas:,} registros.")
-
+            temp_csv_files.append(csv_temp_path)
+            qtd_linhas = contar_linhas_arquivo(csv_temp_path)
+            relatorio_linhas_por_ano[ano] = qtd_linhas
+            print(f"✅ Ano {ano} extraído com sucesso ({qtd_linhas:,} registros).")
+            
         except Exception as e:
-            print(f"❌ Erro crítico ao baixar/extrair o ano {ano}: {e}")
+            print(f"❌ Erro no processamento local do ano {ano}: {e}")
 
-    # 6. Empilhamento e Consolidação dos CSVs Brutos (Mantendo formato original)
     if temp_csv_files:
-        print("\n--- 📦 Consolidando Arquivo Final na Camada RAW ---")
+        print("\n--- 📦 Consolidando Dataset Único na Camada RAW ---")
         try:
             first_file = True
             with open(FINAL_RAW_FILE, 'w', encoding='latin-1') as outfile:
                 for temp_csv in temp_csv_files:
                     with open(temp_csv, 'r', encoding='latin-1') as infile:
-                        # Lê a primeira linha (cabeçalho)
                         header = infile.readline()
-                        
-                        # Se for o primeiro arquivo da lista, escreve o cabeçalho
                         if first_file:
                             outfile.write(header)
                             first_file = False
-                        
-                        # Escreve o restante das linhas do corpo do arquivo
                         shutil.copyfileobj(infile, outfile)
-                    print(f"➕ Agregado com sucesso: {temp_csv.name}")
+                    print(f"➕ Agregado: {temp_csv.name}")
 
-            # Contagem final e emissão dos indicadores para a governança
-            total_geral_registros = contar_linhas_arquivo(FINAL_RAW_FILE)
+            total_geral = contar_linhas_arquivo(FINAL_RAW_FILE)
 
             print("\n==========================================================")
-            print("📊 RELATÓRIO DE VOLUMETRIA POR SÉRIE HISTÓRICA (RAW)")
+            print(f"📊 RELATÓRIO DE VOLUMETRIA CONSOLIDADA - BRUTO ({datestamp_hoje})")
             print("==========================================================")
             for ano_ref, total_ano in sorted(relatorio_linhas_por_ano.items()):
-                print(f" ──> Ano {ano_ref}: {total_ano:,} linhas de indivíduos.")
+                print(f" ──> Série Histórica {ano_ref}: {total_ano:,} linhas.")
             print("──────────────────────────────────────────────────────────")
-            print(f" Total Geral Consolidado: {total_geral_registros:,} registros empilhados.")
+            print(f" Total Geral Unificado: {total_geral:,} registros empilhados.")
             print("==========================================================")
-
-            print(f"\n✨ Sucesso! Base geral imutável salva em: {FINAL_RAW_FILE}")
-            print(f"💾 Tamanho total do CSV bruto: {FINAL_RAW_FILE.stat().st_size / (1024*1024):.2f} MB")
+            print(f"\n✨ Sucesso! Base original salva em: {FINAL_RAW_FILE}")
+            print(f"💾 Tamanho do arquivo final: {FINAL_RAW_FILE.stat().st_size / (1024*1024):.2f} MB")
 
         except Exception as e:
-            print(f"❌ Erro ao consolidar os arquivos CSV: {e}")
+            print(f"❌ Erro na consolidação do arquivo final: {e}")
 
-    # 7. Limpeza e expurgo da pasta temporária
     if TEMP_DIR.exists():
         shutil.rmtree(TEMP_DIR)
-    print("\n🧹 Pasta temporária limpa com sucesso. Ingestão Concluída!")
+    print("\n🧹 Pasta temporária limpa. Ingestão Concluída!")
 
 if __name__ == "__main__":
     main()
