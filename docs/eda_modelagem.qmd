@@ -1,0 +1,166 @@
+---
+title: "Sprint 3: Análise Exploratória & Modelo Dimensional"
+subtitle: "Introdução à Ciência de Dados - PPGCA 2026.1"
+author: "Equipe"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    theme: cosmo
+    code-fold: true
+execute:
+  warning: false
+  message: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+import os
+import duckdb
+import plotly.express as px
+import plotly.io as pio
+
+# Configura o template padrão do Plotly para os gráficos
+pio.templates.default = "plotly_white"
+
+# Define caminhos absolutos do projeto
+PROJECT_ROOT = os.path.abspath(os.path.join(os.getcwd(), ".."))
+MART_DIR = os.path.join(PROJECT_ROOT, "data", "mart")
+
+# Inicializa conexão DuckDB em memória
+con = duckdb.connect(database=":memory:")
+
+# Registra os Parquets da camada MART como Tabelas Virtuais no DuckDB
+con.execute(f"CREATE TABLE fato_acidentes_veiculos AS SELECT * FROM read_parquet('{MART_DIR}/fato_acidentes_veiculos.parquet')")
+con.execute(f"CREATE TABLE dim_calendario AS SELECT * FROM read_parquet('{MART_DIR}/dim_calendario.parquet')")
+con.execute(f"CREATE TABLE dim_localidade AS SELECT * FROM read_parquet('{MART_DIR}/dim_localidade.parquet')")
+con.execute(f"CREATE TABLE dim_envolvido AS SELECT * FROM read_parquet('{MART_DIR}/dim_envolvido.parquet')")
+```
+
+🔍 Pergunta 1: Concentração Geográfica e Share Nacional
+Quais são as Unidades Federativas (UF) com a maior quantidade de envolvidos afetados no acumulado histórico, e qual é a participação percentual (share) de cada uma sobre o total do país?
+
+Justificativa: Identificar os pólos geográficos de maior severidade nos ajuda a mapear onde os recursos de fiscalização são prioritariamente exigidos.
+
+Abordagem Técnica: Uso de CTE para calcular o total geral do país e somar os envolvidos agrupados por UF antes de calcular o percentual relativo.
+
+#| label: query_pergunta_1
+```{python}
+df_p1 = con.execute("""
+    WITH total_nacional AS (
+        SELECT SUM(qtd_registros_envolvidos) AS total_geral
+        FROM fato_acidentes_veiculos
+    )
+    SELECT 
+        loc.uf,
+        SUM(f.qtd_registros_envolvidos) AS total_envolvidos,
+        ROUND((SUM(f.qtd_registros_envolvidos)::DOUBLE / (SELECT total_geral FROM total_nacional)) * 100, 2) AS percentual_share
+    FROM fato_acidentes_veiculos f
+    JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
+    GROUP BY loc.uf
+    ORDER BY total_envolvidos DESC
+    LIMIT 10;
+""").df()
+
+df_p1
+```
+
+#| label: chart_pergunta_1
+```{python}
+fig1 = px.bar(
+    df_p1, 
+    x='uf', 
+    y='total_envolvidos',
+    text='percentual_share',
+    title="Top 10 UFs por Volume de Envolvidos e Part. % (2021-2025)",
+    labels={'uf': 'Estado (UF)', 'total_envolvidos': 'Total de Envolvidos'}
+)
+fig1.update_traces(texttemplate='%{text}%', textposition='outside')
+fig1.show()
+```
+
+Análise dos Achados: O gráfico acima destaca de forma clara a disparidade regional do volume de ocorrências. Os estados listados no topo concentram a maior parte do share nacional, justificando ações de infraestrutura focalizadas.
+
+-------------------------------------------------------------------------
+
+🔍 Pergunta 2: Padrão de Risco por Tipo de Envolvido
+Como se distribui a média de veículos envolvidos por acidente em relação ao papel descritivo de cada envolvido (Condutor, Passageiro, Pedestre, etc.)?
+
+Justificativa: Permite compreender se acidentes com múltiplas colisões (ex: engavetamentos) tendem a afetar mais passageiros ou se há correlações com atropelamentos.
+
+Abordagem Técnica: Aplicação de Window Function para avaliar as médias sem perder as quebras descritivas das dimensões.
+
+#| label: query_pergunta_2
+```{python}
+df_p2 = con.execute("""
+    SELECT DISTINCT
+        env.tipo_envolvido,
+        ROUND(AVG(f.total_veiculos_no_acidente) OVER(PARTITION BY env.tipo_envolvido), 2) AS media_veiculos_por_acidente
+    FROM fato_acidentes_veiculos f
+    JOIN dim_envolvido env ON f.id_envolvido = env.id_envolvido
+    ORDER BY media_veiculos_por_acidente DESC;
+""").df()
+
+df_p2
+```
+
+#| label: chart_pergunta_2
+```{python}
+fig2 = px.bar(
+    df_p2,
+    y='tipo_envolvido',
+    x='media_veiculos_por_acidente',
+    orientation='h',
+    title="Média de Veículos no Acidente por Papel do Envolvido",
+    labels={'tipo_envolvido': 'Tipo de Envolvido', 'media_veiculos_por_acidente': 'Média de Veículos'}
+)
+fig2.show()
+```
+
+Análise dos Achados: Observamos que determinados papéis de envolvidos aparecem em acidentes com maior média de veículos. Isso sugere que acidentes complexos e com colisões múltiplas ampliam o risco para ocupantes específicos
+
+-------------------------------------------------------------------------
+
+🔍 Pergunta 3: Sazonalidade Temporal (Evolução Ano/Mês)
+Historicamente, quais meses ou trimestres do ano registram picos consistentes no volume acumulado de ocorrências, sugerindo padrões sazonais?
+
+Justificativa: Essencial para planejar operações especiais de feriados e períodos de férias de forma preditiva.
+
+
+Abordagem Técnica: Cruzamento da tabela Fato com a Dimensão Calendário criada via generate_series, aplicando agrupamentos cronológicos por ano e mês.
+
+#| label: query_pergunta_3
+```{python}
+df_p3 = con.execute("""
+    SELECT 
+        c.ano,
+        c.mes,
+        c.mes_ano,
+        COUNT(DISTINCT f.id_acidente_original) AS total_acidentes
+    FROM fato_acidentes_veiculos f
+    JOIN dim_calendario c ON f.id_data_fato = c.id_data
+    GROUP BY c.ano, c.mes, c.mes_ano
+    ORDER BY c.ano ASC, c.mes ASC;
+""").df()
+
+df_p3
+```
+
+#| label: chart_pergunta_3
+```{python}
+fig3 = px.line(
+    df_p3, 
+    x='mes_ano', 
+    y='total_acidentes',  
+    color='ano',
+    title="Evolução Temporal Sazonal de Acidentes (2021-2025)",
+    labels={'mes_ano': 'Período Mensal', 'total_acidentes': 'Quantidade de Ocorrências'}
+)
+fig3.show()
+```
+
+Análise dos Achados: O gráfico gerado apresenta uma distribuição temporal linear e uniforme ao longo dos meses de 2021 a 2025. Este comportamento é um reflexo direto da nossa estratégia de engenharia de dados na camada Mart, onde geramos uma chave temporal sequencial programática para suprir a ausência do campo de data original da fonte. Embora o gráfico sirva perfeitamente para validar a robustez estrutural do relacionamento do Star Schema com a dim_calendario, para uma análise de sazonalidade real de picos de férias e feriados, seria mandatório o resgate do carimbo de data original do fato.
+
+
