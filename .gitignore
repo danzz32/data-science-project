@@ -18,6 +18,18 @@ __pycache__/
 # Permite explicitamente o arquivo de exemplo exigido no seu README
 !.env.example
 
+# Ignora configurações locais de IDE (preferências pessoais, credenciais)
+.vscode/settings.json
+.vscode/launch.json
+.vscode/*.json
+
+# Ignora arquivos de configuração local de editors
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
 # ==========================================
 # 3. CAMADAS DO DATA LAKE LOCAL (Controle Estrito)
 # ==========================================
@@ -50,3 +62,19 @@ data/quarantine/*.parquet
 # Ignora caches locais do Quarto/Jupyter se você renderizar os relatórios
 .markdown-notebook/
 .ipynb_checkpoints/
+
+# ==========================================
+# 5. ARTEFATOS DE BUILD E EXECUÇÃO
+# ==========================================
+# Logs de execução
+*.log
+logs/
+
+# Arquivos temporários
+*.tmp
+*.temp
+.tmp/
+
+# Relatórios renderizados (opcional - comentar se quiser rastreá-los)
+reports/*.html
+reports/*.pdf
