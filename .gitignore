@@ -12,7 +12,6 @@ __pycache__/
 .venv/
 .uv/
 .vulture_ignore
-<<<<<<< HEAD
 
 # ==========================================
 # 2. GOVERNANÇA E SEGURANÇA (Regra de Desclassificação)
@@ -85,43 +84,3 @@ logs/
 # Relatórios renderizados (opcional - comentar se quiser rastreá-los)
 reports/*.html
 reports/*.pdf
-=======
-.vscode/
-.idea/
-
-# =====================================================================
-# 2. SEGURANÇA (Gerenciamento do Ambiente de Ingestão)
-# =====================================================================
-.env
-.env.*
-*.env
-!.env.example
-
-# =====================================================================
-# 3. GOVERNANÇA DO DATA LAKE (Camadas Isoladas e Imutáveis)
-# =====================================================================
-# Camada RAW: Mantém os arquivos de origem anuais intocados
-data/raw/*
-!data/raw/.gitkeep
-
-# Camada TRUSTED: Armazenamento colunar otimizado
-data/trusted/*.parquet
-!data/trusted/.gitkeep
-
-# Camada QUARANTINE: Isolamento de falhas críticas
-data/quarantine/*.parquet
-!data/quarantine/.gitkeep
-
-# =====================================================================
-# 4. DOCUMENTAÇÃO, QUARTO E ARTEFATOS DE COMPILAÇÃO
-# =====================================================================
-!docs/
-!docs/*.qmd
-!docs/*.ipynb
-
-# Bloqueia arquivos e caches gerados pela renderização do Quarto
-docs/eda_qualidade_files/
-docs/.tmp/
-.markdown-notebook/
-.ipynb_checkpoints/
->>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
