@@ -181,7 +181,6 @@ brew install quarto
 ```bash
 quarto --version
 ```
-
 ---
 
 # 🧩 Extensões Recomendadas do VS Code
