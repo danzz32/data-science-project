@@ -77,7 +77,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
 
 <script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+<<<<<<< HEAD
+=======
 <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@*/dist/embed-amd.js" crossorigin="anonymous"></script>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 
 
 </head>
@@ -96,8 +99,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </ul></li>
   <li><a href="#dimensão-completude" id="toc-dimensão-completude" class="nav-link" data-scroll-target="#dimensão-completude">1. Dimensão: Completude</a></li>
   <li><a href="#dimensão-consistência" id="toc-dimensão-consistência" class="nav-link" data-scroll-target="#dimensão-consistência">2. Dimensão: Consistência</a></li>
+<<<<<<< HEAD
+  <li><a href="#verificação-de-consistência---prf" id="toc-verificação-de-consistência---prf" class="nav-link" data-scroll-target="#verificação-de-consistência---prf">Verificação de consistência - PRF</a></li>
+  <li><a href="#dimensão-acurácia" id="toc-dimensão-acurácia" class="nav-link" data-scroll-target="#dimensão-acurácia">3. Dimensão: Acurácia</a></li>
+  <li><a href="#dimensão-temporalidade" id="toc-dimensão-temporalidade" class="nav-link" data-scroll-target="#dimensão-temporalidade">4. Dimensão: Temporalidade</a></li>
+=======
   <li><a href="#configuração-de-caminhos-dinâmicos" id="toc-configuração-de-caminhos-dinâmicos" class="nav-link" data-scroll-target="#configuração-de-caminhos-dinâmicos">1. Configuração de caminhos dinâmicos</a></li>
   <li><a href="#dimensão-acurácia" id="toc-dimensão-acurácia" class="nav-link" data-scroll-target="#dimensão-acurácia">3. Dimensão: Acurácia</a></li>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
   </ul>
 </nav>
 </div>
@@ -139,6 +148,48 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Este notebook tem como objetivo documentar o perfil de qualidade dos dados brutos de acidentes da PRF (camada <code>raw/</code>). O diagnóstico guiará as decisões de tratamento que serão implementadas no script <code>transform.py</code>. A análise está dividida nas quatro dimensões de Batini et al.&nbsp;(2009): Completude, Consistência, Acurácia e Temporalidade.</p>
 <section id="setup-e-carregamento" class="level2">
 <h2 class="anchored" data-anchor-id="setup-e-carregamento">Setup e Carregamento</h2>
+<<<<<<< HEAD
+<div id="4f06e4a5" class="cell" data-execution_count="1">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> seaborn <span class="im">as</span> sns</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Configurações visuais</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>sns.set_theme(style<span class="op">=</span><span class="st">"whitegrid"</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Configuração de Caminhos para a pasta raw/</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>PROJECT_ROOT <span class="op">=</span> Path.cwd().parent</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>RAW_DIR <span class="op">=</span> PROJECT_ROOT <span class="op">/</span> <span class="st">"data"</span> <span class="op">/</span> <span class="st">"raw"</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Busca o ficheiro bruto mais recente</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>arquivos_encontrados <span class="op">=</span> <span class="bu">list</span>(RAW_DIR.glob(<span class="st">"prf_191_*.csv"</span>))</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> arquivos_encontrados:</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    RAW_FILE_PATH <span class="op">=</span> <span class="bu">max</span>(arquivos_encontrados, key<span class="op">=</span><span class="kw">lambda</span> p: p.stat().st_mtime)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"📂 A ler ficheiro: </span><span class="sc">{</span>RAW_FILE_PATH<span class="sc">.</span>name<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Leitura com os padrões do governo (latin-1, separador ponto e vírgula)</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    df <span class="op">=</span> pd.read_csv(RAW_FILE_PATH, sep<span class="op">=</span><span class="st">';'</span>, encoding<span class="op">=</span><span class="st">'latin-1'</span>, low_memory<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"🎯 Total de registos iniciais: </span><span class="sc">{</span><span class="bu">len</span>(df)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"🎯 Total de colunas: </span><span class="sc">{</span><span class="bu">len</span>(df.columns)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">As colunas da base são:"</span>)</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(df.columns.tolist())</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"⚠️ Nenhum ficheiro encontrado na pasta raw/."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>📂 A ler ficheiro: prf_191_2026-05-26.csv
+🎯 Total de registos iniciais: 342624
+🎯 Total de colunas: 30
+
+As colunas da base são:
+['id', 'data_inversa', 'dia_semana', 'horario', 'uf', 'br', 'km', 'municipio', 'causa_acidente', 'tipo_acidente', 'classificacao_acidente', 'fase_dia', 'sentido_via', 'condicao_metereologica', 'tipo_pista', 'tracado_via', 'uso_solo', 'pessoas', 'mortos', 'feridos_leves', 'feridos_graves', 'ilesos', 'ignorados', 'feridos', 'veiculos', 'latitude', 'longitude', 'regional', 'delegacia', 'uop']</code></pre>
+=======
 <div id="e0c2f5f6" class="cell" data-execution_count="1">
 <details open="" class="code-fold">
 <summary>Code</summary>
@@ -420,6 +471,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
    • Linhas Totais (Pessoas)     : 2.702.004 registros de envolvidos.
 
 📊 Volumetria Total na Camada RAW: 2.702.004 registros (linhas por pessoa/envolvido).</code></pre>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 </div>
 </div>
 </section>
@@ -427,6 +479,25 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="dimensão-completude" class="level1">
 <h1>1. Dimensão: Completude</h1>
 <p><strong>Objetivo:</strong> Identificar campos com valores ausentes (nulos), a proporção de falta e se existe algum padrão.</p>
+<<<<<<< HEAD
+<div id="ae77b325" class="cell" data-execution_count="2">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Calcula a percentagem de nulos por coluna</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>nulos <span class="op">=</span> df.isnull().<span class="bu">sum</span>()</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>nulos_pct <span class="op">=</span> (nulos <span class="op">/</span> <span class="bu">len</span>(df)) <span class="op">*</span> <span class="dv">100</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Filtra apenas colunas que possuem nulos e ordena</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>df_nulos <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Total_Nulos'</span>: nulos,</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Percentagem (%)'</span>: nulos_pct.<span class="bu">round</span>(<span class="dv">2</span>)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>df_nulos[<span class="st">'Percentagem (%)'</span>] <span class="op">=</span> df_nulos[<span class="st">'Percentagem (%)'</span>].<span class="bu">map</span>(<span class="st">'</span><span class="sc">{:.2f}</span><span class="st">%'</span>.<span class="bu">format</span>)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>display(df_nulos)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+=======
 <div id="df035637" class="cell" data-execution_count="2">
 <details open="" class="code-fold">
 <summary>Code</summary>
@@ -621,6 +692,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <pre><code>
 📋 Tabela Completa de Completude (Todas as Colunas do Dataset Bruto):</code></pre>
 </div>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <div class="cell-output cell-output-display">
 <div>
 
@@ -630,11 +702,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="header">
 <th data-quarto-table-cell-role="th"></th>
 <th data-quarto-table-cell-role="th">Total_Nulos</th>
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">Percentagem (%)</th>
+=======
 <th data-quarto-table-cell-role="th">Percentual_Nulos (%)</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">id</th>
+=======
 <th data-quarto-table-cell-role="th">idade</th>
 <td>500.347</td>
 <td>18.52%</td>
@@ -726,6 +805,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">dia_semana</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
@@ -735,7 +815,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>0.00%</td>
 </tr>
 <tr class="odd">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">dia_semana</th>
+=======
 <th data-quarto-table-cell-role="th">id</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
@@ -745,22 +829,58 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>0.00%</td>
 </tr>
 <tr class="odd">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">uf</th>
+=======
 <th data-quarto-table-cell-role="th">tracado_via</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="even">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">br</th>
+=======
 <th data-quarto-table-cell-role="th">tipo_pista</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="odd">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">km</th>
+=======
 <th data-quarto-table-cell-role="th">condicao_metereologica</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="even">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">municipio</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">causa_acidente</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">tipo_acidente</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">classificacao_acidente</th>
+<td>5</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">fase_dia</th>
+=======
 <th data-quarto-table-cell-role="th">uso_solo</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
@@ -770,42 +890,94 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>0.00%</td>
 </tr>
 <tr class="even">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">condicao_metereologica</th>
+=======
 <th data-quarto-table-cell-role="th">ordem_tipo_acidente</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="odd">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">tipo_pista</th>
+=======
 <th data-quarto-table-cell-role="th">tipo_acidente</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="even">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">tracado_via</th>
+=======
 <th data-quarto-table-cell-role="th">municipio</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="odd">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">uso_solo</th>
+=======
 <th data-quarto-table-cell-role="th">uf</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="even">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">pessoas</th>
+=======
 <th data-quarto-table-cell-role="th">causa_acidente</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="odd">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">mortos</th>
+=======
 <th data-quarto-table-cell-role="th">causa_principal</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="even">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">feridos_leves</th>
+=======
 <th data-quarto-table-cell-role="th">fase_dia</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
 <tr class="odd">
+<<<<<<< HEAD
+<th data-quarto-table-cell-role="th">feridos_graves</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">ilesos</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">ignorados</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">feridos</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">veiculos</th>
+=======
 <th data-quarto-table-cell-role="th">marca</th>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <td>0</td>
 <td>0.00%</td>
 </tr>
@@ -819,6 +991,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>0</td>
 <td>0.00%</td>
 </tr>
+<<<<<<< HEAD
+<tr class="even">
+<th data-quarto-table-cell-role="th">regional</th>
+<td>27</td>
+<td>0.01%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">delegacia</th>
+<td>127</td>
+<td>0.04%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">uop</th>
+<td>282</td>
+<td>0.08%</td>
+=======
 </tbody>
 </table>
 
@@ -1008,6 +1196,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <th data-quarto-table-cell-role="th">DF</th>
 <td>10.19%</td>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 </tr>
 </tbody>
 </table>
@@ -1015,11 +1204,26 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 </div>
+<<<<<<< HEAD
+<p>📝 Conclusão da Equipe (Completude):</p>
+=======
 <p>📝 Conclusão da Equipe (Completude): A dimensão de Completude e Granularidade revelou que a base bruta possui 2.702.004 registros, operando em uma estrutura onde cada acidente envolve, em média, 7,89 linhas, o que confirma a orientação do dataset ao indivíduo. Contudo, os volumes máximos alarmantes de repetição para o ID da Pessoa (263.997) e do Veículo (94.472) indicam o uso massivo de máscaras textuais genéricas (como “0” ou “NÃO IDENTIFICADO”) para tratar registros sem identificação clara na ponta. No aspecto de dados ausentes, a variável idade consolidou-se como o campo de negócio mais crítico, apresentando uma taxa crônica de 18,52% de nulos que se mantém estável temporalmente (flutuando na faixa dos 18% entre 2021 e 2025), mas que exibe uma severa assimetria geográfica, concentrando as maiores falhas de preenchimento em estados como Mato Grosso (31,26%) e Pará (29,94%). Adicionalmente, detectou-se um comportamento de omissão em bloco (9,77% de nulos idênticos) para variáveis físicas e de gravidade (sexo, estado_fisico, mortos, feridos), evidenciando um padrão de ausência não-aleatório que desafia a integridade estatística e exige tratamento prioritário na etapa de transformação.</p>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 </section>
 <section id="dimensão-consistência" class="level1">
 <h1>2. Dimensão: Consistência</h1>
 <p><strong>Objetivo:</strong> Verificar contradições internas na base de dados.</p>
+<<<<<<< HEAD
+</section>
+<section id="verificação-de-consistência---prf" class="level1">
+<h1>Verificação de consistência - PRF</h1>
+<p>colunas_esperadas = [‘mortos’, ‘feridos_leves’, ‘feridos_graves’, ‘veiculos’] if all(c in df.columns for c in colunas_esperadas): # Valores numéricos não podem ser negativos negativos = df[(df[‘mortos’] &lt; 0) | (df[‘feridos_leves’] &lt; 0) | (df[‘feridos_graves’] &lt; 0)] print(f”Registos com contagem negativa de vítimas: {len(negativos)}“)</p>
+<pre><code># Inconsistência lógica: Acidente com vítimas, mas sem veículos envolvidos
+sem_veiculo = df[(df['veiculos'] == 0) &amp; ((df['mortos'] &gt; 0) | (df['feridos_leves'] &gt; 0))]
+print(f"Registos com vítimas mas zero veículos envolvidos: {len(sem_veiculo)}")</code></pre>
+<p>else: print(“Colunas de vítimas/veículos não encontradas com estes nomes.”) ```</p>
+<p>📝 Conclusão da Equipe (Consistência):</p>
+=======
 <p>import duckdb import os import pandas as pd from pathlib import Path</p>
 <p>print(“🛡️ Iniciando Testes de Consistência Interna com DuckDB (Versão Corrigida)…”)</p>
 </section>
@@ -1134,10 +1338,64 @@ r7 = con.execute("""
 print(f"   ❌ Regra 7: Registros com coordenadas de GPS inválidas ou fora do Brasil: {r7:,}".replace(',', '.'))</code></pre>
 <p>else: print(f”❌ Erro: Nenhum arquivo bruto foi localizado em {RAW_DIR}“) ```</p>
 <p>📝 Conclusão da Equipe (Consistência):Os resultados da auditoria de Consistência Interna revelaram distorções massivas e sistêmicas na base bruta que expõem a incompatibilidade de aplicar regras relacionais tradicionais diretamente em um dataset orientado ao indivíduo. A ausência de registros negativos (Regra 1) e de contradições textuais na classificação do acidente (Regras 5 e 6), aliada ao número irrisório de coordenadas de GPS inválidas ou fora do território nacional (Regra 7: apenas 34 casos), atesta que os dados individuais inseridos possuem boa integridade isolada. No entanto, o colapso lógico ocorre nas validações agregadas: a identificação de 1.273.410 acidentes com vítimas mas zero veículos (Regra 2) e 2.272.211 inconsistências na soma total de pessoas (Regra 4) não indica necessariamente erros de digitação dos agentes da PRF, mas sim um reflexo direto da granularidade da base. Como o arquivo bruto repete as linhas para cada pessoa envolvida e herda colunas de contadores macro (como o total de veículos e pessoas daquela ocorrência), a soma simples desses campos em todas as linhas gera um efeito multiplicador inflacionário artificial, exigindo que a etapa de transformação trate essas variáveis de forma contextualizada ou faça a normalização das tabelas para evitar análises duplicadas na Trusted.</p>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 </section>
 <section id="dimensão-acurácia" class="level1">
 <h1>3. Dimensão: Acurácia</h1>
 <p><strong>Objetivo:</strong> Verificar se os valores existentes fazem sentido, analisar a tipagem correta e detetar outliers.</p>
+<<<<<<< HEAD
+<pre class="{python}"><code># 3.1 Verificação de Tipos Incorretos
+print("Tipos de dados atuais (algumas colunas):")
+display(df.dtypes.head(10))
+
+# 3.2 Validação de Domínio (Exemplo com UF)
+if 'uf' in df.columns:
+    ufs_invalidas = df[~df['uf'].isin(['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+                                       'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN',
+                                       'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'])]
+    print(f"\nRegistos com UF fora do domínio (inválidas): {len(ufs_invalidas)}")
+
+# 3.3 Outliers (Exemplo visual em colunas numéricas)
+# Seleciona apenas algumas numéricas para evitar poluição visual
+num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+
+if num_cols:
+    plt.figure(figsize=(12, 5))
+    sns.boxplot(data=df[num_cols[:5]]) # Plota as 5 primeiras colunas numéricas
+    plt.title('Distribuição Numérica - Busca por Outliers')
+    plt.xticks(rotation=45)
+    plt.show()</code></pre>
+<p>📝 Conclusão da Equipe (Acurácia):</p>
+</section>
+<section id="dimensão-temporalidade" class="level1">
+<h1>4. Dimensão: Temporalidade</h1>
+<p><strong>Objetivo:</strong> Avaliar a correção das datas e a existência de lacunas no tempo ou datas futuras.</p>
+<pre class="{python}"><code>if 'data_inversa' in df.columns:
+    # Tenta converter para datetime para validar
+    df['data_parsed'] = pd.to_datetime(df['data_inversa'], errors='coerce', dayfirst=True)
+
+    datas_invalidas = df['data_parsed'].isnull().sum()
+    print(f"Datas com formato inválido/incompreensível: {datas_invalidas}")
+
+    if datas_invalidas &lt; len(df):
+        print(f"Data mais antiga: {df['data_parsed'].min()}")
+        print(f"Data mais recente: {df['data_parsed'].max()}")
+
+        # Tem dados no futuro?
+        futuro = df[df['data_parsed'] &gt; pd.Timestamp.now()]
+        print(f"Registos com data no futuro: {len(futuro)}")
+
+        # Histograma para ver a distribuição ao longo do tempo
+        plt.figure(figsize=(10, 4))
+        df['data_parsed'].dt.to_period('M').value_counts().sort_index().plot(kind='bar')
+        plt.title('Volume de Acidentes por Mês')
+        plt.xlabel('Ano-Mês')
+        plt.ylabel('Qtd Registos')
+        plt.show()
+else:
+    print("Coluna de data não encontrada.")</code></pre>
+<p>📝 Conclusão da Equipe (Temporalidade):</p>
+=======
 <pre class="{python}"><code>import duckdb
 import os
 import pandas as pd
@@ -1410,13 +1668,17 @@ if arquivos_csv:
 else:
     print(f"❌ Erro: Nenhum arquivo bruto foi localizado em {RAW_DIR}")</code></pre>
 <p>📝 Conclusão da Equipe (Temporalidade): A dimensão de Temporalidade, validada com o DuckDB, atestou a integridade cronológica absoluta da base de dados bruta ao registrar zero ocorrências de datas corrompidas (Regra 1), zero registros com viagens no tempo em relação ao calendário atual (Regra 3) e zero lacunas diárias (Regra 4) ao longo de toda a série histórica, garantindo uma cobertura ininterrupta de 365 dias por ano. O mapeamento da série (Regra 2) delimitou um intervalo perfeito de cinco anos fechados, iniciando em 01/01/2021 e finalizando em 31/12/2025. Ao analisar o gráfico de evolução mensal gerado a partir do processamento vetorizado, observa-se uma tendência de crescimento estrutural no volume de registros entre 2021 e final de 2024, acompanhada por um padrão de sazonalidade recorrente caracterizado por picos agudos de ocorrências nos meses de dezembro (férias e festividades de fim de ano) seguidos de quedas abruptas nos primeiros meses de cada ano subsequente. Esse comportamento macro perfeitamente delimitado e livre de ruídos de preenchimento valida a qualidade cronológica do ecossistema RAW, indicando que a série temporal está madura e pronta para subsidiar análises preditivas ou modelos de decomposição de tendências na camada trusted.</p>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 </section>
 
 </main>
 <!-- /main column -->
+<<<<<<< HEAD
+=======
 <script type="application/vnd.jupyter.widget-state+json">
 {"state":{"0f31562d11a142679b5a6fa31bf74b7d":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}},"11247f584cf44c068808f96c8a4856ac":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_f7da7757c916427a8431fba05dab30e8","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_3afe5091bf8c46c9afd73994b81a5564","tabbable":null,"tooltip":null,"value":100}},"25062be446804d6d82ea7db5ccab08f4":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}},"3afe5091bf8c46c9afd73994b81a5564":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"3f57cd6c85334cb3b0360e27058888ed":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_645c022e2323417698460aa1ff51fa6a","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_97810841fc204c30a18af7246315b150","tabbable":null,"tooltip":null,"value":100}},"5759a572e10c49149265e5c7b7b28500":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_25062be446804d6d82ea7db5ccab08f4","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_a1e69c026f4f48ffb307a73b564849ef","tabbable":null,"tooltip":null,"value":100}},"645c022e2323417698460aa1ff51fa6a":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}},"71994e75724c4f0e931814dd95a2540f":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"71b385dd4a19493bbe8099526f36dc75":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_0f31562d11a142679b5a6fa31bf74b7d","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_83b095e689e343908f0ece9dcb56dcd3","tabbable":null,"tooltip":null,"value":100}},"83b095e689e343908f0ece9dcb56dcd3":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"8d09b153e9ee42bf836e77786f2a983a":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"97810841fc204c30a18af7246315b150":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"a1e69c026f4f48ffb307a73b564849ef":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"add8e889751d45589f3b0ffd82221d90":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_d3d76be3c4fa49deb1b9c10c4081882c","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_71994e75724c4f0e931814dd95a2540f","tabbable":null,"tooltip":null,"value":100}},"c972fcc2edf440d0a683161834eabec9":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}},"d3d76be3c4fa49deb1b9c10c4081882c":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}},"ddb57eec3fae4a71a98bf1a8c7f59cc9":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_c972fcc2edf440d0a683161834eabec9","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_8d09b153e9ee42bf836e77786f2a983a","tabbable":null,"tooltip":null,"value":100}},"f7da7757c916427a8431fba05dab30e8":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}}},"version_major":2,"version_minor":0}
 </script>
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";

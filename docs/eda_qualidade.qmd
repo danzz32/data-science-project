@@ -20,6 +20,37 @@ Este notebook tem como objetivo documentar o perfil de qualidade dos dados bruto
 ## Setup e Carregamento
 
 ```{python}
+<<<<<<< HEAD
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+
+# Configurações visuais
+sns.set_theme(style="whitegrid")
+
+# Configuração de Caminhos para a pasta raw/
+PROJECT_ROOT = Path.cwd().parent
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+
+# Busca o ficheiro bruto mais recente
+arquivos_encontrados = list(RAW_DIR.glob("prf_191_*.csv"))
+
+if arquivos_encontrados:
+    RAW_FILE_PATH = max(arquivos_encontrados, key=lambda p: p.stat().st_mtime)
+    print(f"📂 A ler ficheiro: {RAW_FILE_PATH.name}")
+
+    # Leitura com os padrões do governo (latin-1, separador ponto e vírgula)
+    df = pd.read_csv(RAW_FILE_PATH, sep=';', encoding='latin-1', low_memory=False)
+    print(f"🎯 Total de registos iniciais: {len(df)}")
+    print(f"🎯 Total de colunas: {len(df.columns)}")
+    
+    print("\nAs colunas da base são:")
+    print(df.columns.tolist())
+else:
+    print("⚠️ Nenhum ficheiro encontrado na pasta raw/.")
+=======
 import duckdb
 import os
 from pathlib import Path
@@ -73,6 +104,7 @@ if arquivos_csv:
 
 else:
     print(f"❌ Erro: Nenhum arquivo CSV 'prf_geral_bruto_*.csv' foi localizado em {RAW_DIR}")
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 ```
 
 
@@ -80,6 +112,24 @@ else:
 **Objetivo:** Identificar campos com valores ausentes (nulos), a proporção de falta e se existe algum padrão.
 
 ```{python}
+<<<<<<< HEAD
+# Calcula a percentagem de nulos por coluna
+nulos = df.isnull().sum()
+nulos_pct = (nulos / len(df)) * 100
+
+# Filtra apenas colunas que possuem nulos e ordena
+df_nulos = pd.DataFrame({
+    'Total_Nulos': nulos,
+    'Percentagem (%)': nulos_pct.round(2)
+})
+
+df_nulos['Percentagem (%)'] = df_nulos['Percentagem (%)'].map('{:.2f}%'.format)
+
+display(df_nulos)
+```
+
+📝 Conclusão da Equipe (Completude):
+=======
 import duckdb
 import os
 import pandas as pd
@@ -239,11 +289,30 @@ else:
 ```
 
 📝 Conclusão da Equipe (Completude): A dimensão de Completude e Granularidade revelou que a base bruta possui 2.702.004 registros, operando em uma estrutura onde cada acidente envolve, em média, 7,89 linhas, o que confirma a orientação do dataset ao indivíduo. Contudo, os volumes máximos alarmantes de repetição para o ID da Pessoa (263.997) e do Veículo (94.472) indicam o uso massivo de máscaras textuais genéricas (como "0" ou "NÃO IDENTIFICADO") para tratar registros sem identificação clara na ponta. No aspecto de dados ausentes, a variável idade consolidou-se como o campo de negócio mais crítico, apresentando uma taxa crônica de 18,52% de nulos que se mantém estável temporalmente (flutuando na faixa dos 18% entre 2021 e 2025), mas que exibe uma severa assimetria geográfica, concentrando as maiores falhas de preenchimento em estados como Mato Grosso (31,26%) e Pará (29,94%). Adicionalmente, detectou-se um comportamento de omissão em bloco (9,77% de nulos idênticos) para variáveis físicas e de gravidade (sexo, estado_fisico, mortos, feridos), evidenciando um padrão de ausência não-aleatório que desafia a integridade estatística e exige tratamento prioritário na etapa de transformação.
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 
 # 2. Dimensão: Consistência
 **Objetivo:** Verificar contradições internas na base de dados.
 
 ```{python}
+<<<<<<< HEAD
+# Verificação de consistência - PRF
+colunas_esperadas = ['mortos', 'feridos_leves', 'feridos_graves', 'veiculos']
+if all(c in df.columns for c in colunas_esperadas):
+    # Valores numéricos não podem ser negativos
+    negativos = df[(df['mortos'] < 0) | (df['feridos_leves'] < 0) | (df['feridos_graves'] < 0)]
+    print(f"Registos com contagem negativa de vítimas: {len(negativos)}")
+
+    # Inconsistência lógica: Acidente com vítimas, mas sem veículos envolvidos
+    sem_veiculo = df[(df['veiculos'] == 0) & ((df['mortos'] > 0) | (df['feridos_leves'] > 0))]
+    print(f"Registos com vítimas mas zero veículos envolvidos: {len(sem_veiculo)}")
+else:
+    print("Colunas de vítimas/veículos não encontradas com estes nomes.")
+  ```
+
+📝 Conclusão da Equipe (Consistência):
+
+=======
 import duckdb
 import os
 import pandas as pd
@@ -371,10 +440,41 @@ else:
   ```
 
 📝 Conclusão da Equipe (Consistência):Os resultados da auditoria de Consistência Interna revelaram distorções massivas e sistêmicas na base bruta que expõem a incompatibilidade de aplicar regras relacionais tradicionais diretamente em um dataset orientado ao indivíduo. A ausência de registros negativos (Regra 1) e de contradições textuais na classificação do acidente (Regras 5 e 6), aliada ao número irrisório de coordenadas de GPS inválidas ou fora do território nacional (Regra 7: apenas 34 casos), atesta que os dados individuais inseridos possuem boa integridade isolada. No entanto, o colapso lógico ocorre nas validações agregadas: a identificação de 1.273.410 acidentes com vítimas mas zero veículos (Regra 2) e 2.272.211 inconsistências na soma total de pessoas (Regra 4) não indica necessariamente erros de digitação dos agentes da PRF, mas sim um reflexo direto da granularidade da base. Como o arquivo bruto repete as linhas para cada pessoa envolvida e herda colunas de contadores macro (como o total de veículos e pessoas daquela ocorrência), a soma simples desses campos em todas as linhas gera um efeito multiplicador inflacionário artificial, exigindo que a etapa de transformação trate essas variáveis de forma contextualizada ou faça a normalização das tabelas para evitar análises duplicadas na Trusted.
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 
 # 3. Dimensão: Acurácia
 **Objetivo:** Verificar se os valores existentes fazem sentido, analisar a tipagem correta e detetar outliers.
 
+<<<<<<< HEAD
+
+```{python}
+# 3.1 Verificação de Tipos Incorretos
+print("Tipos de dados atuais (algumas colunas):")
+display(df.dtypes.head(10))
+
+# 3.2 Validação de Domínio (Exemplo com UF)
+if 'uf' in df.columns:
+    ufs_invalidas = df[~df['uf'].isin(['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+                                       'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN',
+                                       'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'])]
+    print(f"\nRegistos com UF fora do domínio (inválidas): {len(ufs_invalidas)}")
+
+# 3.3 Outliers (Exemplo visual em colunas numéricas)
+# Seleciona apenas algumas numéricas para evitar poluição visual
+num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+
+if num_cols:
+    plt.figure(figsize=(12, 5))
+    sns.boxplot(data=df[num_cols[:5]]) # Plota as 5 primeiras colunas numéricas
+    plt.title('Distribuição Numérica - Busca por Outliers')
+    plt.xticks(rotation=45)
+    plt.show()
+  ```
+
+📝 Conclusão da Equipe (Acurácia):
+
+
+=======
 ```{python}
 import duckdb
 import os
@@ -524,11 +624,41 @@ else:
   ```
 
 📝 Conclusão da Equipe (Acurácia): A dimensão de Acurácia, auditada com precisão analítica via DuckDB ao nível agregado do acidente, atestou a integridade categórica do dataset com zero registros de UFs inválidas (Regra 1) e uma cardinalidade textual controlada para variáveis críticas de negócio (Regra 2), mapeando 77 causas exclusivas, 10 condições meteorológicas e 4 classificações de severidade. Contudo, a modelagem estatística por limites pelo método IQR de Extremos (Regra 3) revelou assimetrias severas e comportamentos de cauda longa típicos de grandes desastres logísticos rodoviários: o limite estável estabeleceu o teto estatístico de até 6 pessoas e 5 veículos reais por ocorrência, classificando 7.949 e 4.279 acidentes como outliers volumétricos, respectivamente. O fenômeno mais crítico manifestou-se nos gráficos de caixas das razões de proporção de severidade (Mortos e Feridos), cujos limites estáveis convergiram a zero devido ao predomínio massivo de acidentes leves na base, fazendo com que qualquer ocorrência com alta taxa de letalidade imediata gerasse milhares de anomalias estatísticas isoladas (como os 21.030 acidentes identificados na razão de Feridos Graves por Leves), métricas fundamentais que dão embasamento teórico para delimitar o escopo de modelagem preditiva ou normalização na camada trusted.
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
 # 4. Dimensão: Temporalidade
 **Objetivo:** Avaliar a correção das datas e a existência de lacunas no tempo ou datas futuras.
 
 
 ```{python}
+<<<<<<< HEAD
+if 'data_inversa' in df.columns:
+    # Tenta converter para datetime para validar
+    df['data_parsed'] = pd.to_datetime(df['data_inversa'], errors='coerce', dayfirst=True)
+
+    datas_invalidas = df['data_parsed'].isnull().sum()
+    print(f"Datas com formato inválido/incompreensível: {datas_invalidas}")
+
+    if datas_invalidas < len(df):
+        print(f"Data mais antiga: {df['data_parsed'].min()}")
+        print(f"Data mais recente: {df['data_parsed'].max()}")
+
+        # Tem dados no futuro?
+        futuro = df[df['data_parsed'] > pd.Timestamp.now()]
+        print(f"Registos com data no futuro: {len(futuro)}")
+
+        # Histograma para ver a distribuição ao longo do tempo
+        plt.figure(figsize=(10, 4))
+        df['data_parsed'].dt.to_period('M').value_counts().sort_index().plot(kind='bar')
+        plt.title('Volume de Acidentes por Mês')
+        plt.xlabel('Ano-Mês')
+        plt.ylabel('Qtd Registos')
+        plt.show()
+else:
+    print("Coluna de data não encontrada.")
+  ```
+
+  📝 Conclusão da Equipe (Temporalidade):
+=======
 import duckdb
 import os
 import pandas as pd
@@ -657,3 +787,4 @@ else:
   ```
 
   📝 Conclusão da Equipe (Temporalidade): A dimensão de Temporalidade, validada com o DuckDB, atestou a integridade cronológica absoluta da base de dados bruta ao registrar zero ocorrências de datas corrompidas (Regra 1), zero registros com viagens no tempo em relação ao calendário atual (Regra 3) e zero lacunas diárias (Regra 4) ao longo de toda a série histórica, garantindo uma cobertura ininterrupta de 365 dias por ano. O mapeamento da série (Regra 2) delimitou um intervalo perfeito de cinco anos fechados, iniciando em 01/01/2021 e finalizando em 31/12/2025. Ao analisar o gráfico de evolução mensal gerado a partir do processamento vetorizado, observa-se uma tendência de crescimento estrutural no volume de registros entre 2021 e final de 2024, acompanhada por um padrão de sazonalidade recorrente caracterizado por picos agudos de ocorrências nos meses de dezembro (férias e festividades de fim de ano) seguidos de quedas abruptas nos primeiros meses de cada ano subsequente. Esse comportamento macro perfeitamente delimitado e livre de ruídos de preenchimento valida a qualidade cronológica do ecossistema RAW, indicando que a série temporal está madura e pronta para subsidiar análises preditivas ou modelos de decomposição de tendências na camada trusted.
+>>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
