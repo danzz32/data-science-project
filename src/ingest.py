@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 
+#Correção no PR para main
 # Desabilita avisos de certificados TLS/SSL inválidos gerados pelo site do governo
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
