@@ -7,6 +7,7 @@ from pathlib import Path
 import logging
 from datetime import datetime
 
+#Correção no PR para main
 # Configuração de log profissional
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
