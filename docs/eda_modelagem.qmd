@@ -9,6 +9,7 @@ format:
     toc-depth: 3
     theme: cosmo
     code-fold: true
+    output-dir: ../reports
 execute:
   warning: false
   message: false

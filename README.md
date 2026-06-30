@@ -12,173 +12,56 @@ O foco analítico principal deste estudo está no recorte regional do estado do 
 
 ---
 
-# 🛠 Pré-requisitos
+## 🧱 MODELO DIMENSIONAL
+
+<div align="justify">
+A camada final do pipeline (Mart), construída em <code>src/build_mart.py</code> com <b>DuckDB</b>, organiza os dados da camada Trusted em um <b>modelo dimensional em esquema estrela (star schema)</b>, persistido em arquivos Parquet na pasta <code>data/mart/</code>.
+</div>
+
+**Tabela fato:**
+
+| Tabela | Descrição |
+|---|---|
+| `fato_acidentes_veiculos` | Grão: um registro por veículo envolvido em um acidente. Contém `id_acidente_original`, `id_veiculo_original`, as chaves estrangeiras para as dimensões (`id_data_fato`, `id_localidade`, `id_envolvido`) e as métricas `qtd_registros_envolvidos` e `total_veiculos_no_acidente` (calculada via window function, particionada por acidente). |
+
+**Tabelas dimensão:**
+
+| Dimensão | Descrição |
+|---|---|
+| `dim_calendario` | Dimensão calendário gerada programaticamente (2021–2025), independente da fonte original, com `id_data`, `data_completa`, `ano`, `mes`, `mes_ano`, `trimestre`, `dia_da_semana` e `nome_dia_semana`. |
+| `dim_localidade` | Unidades Federativas (`uf`) distintas, com chave `id_localidade` gerada via hash MD5. |
+| `dim_envolvido` | Tipos de envolvido (`tipo_envolvido`) distintos, com chave `id_envolvido` gerada via hash MD5. |
+
+> ⚠️ **Nota sobre a dimensão calendário:** como a camada Trusted não possui uma coluna de data original confiável para o relacionamento, `id_data_fato` é atribuído de forma sequencial/cíclica (via `ROW_NUMBER()` sobre uma janela de 1825 dias) e não representa a data real do acidente. Essa limitação deve ser tratada em uma próxima iteração do pipeline (ex.: recuperar a data original da fonte PRF).
+
+**View analítica:**
+
+- `v_kpi_envolvidos_por_uf` — agregação de `fato_acidentes_veiculos` por UF, com total de acidentes e total de envolvidos afetados.
+
+> 📎 Detalhamento completo de cada coluna, tipo de dado e regra de derivação está disponível no **dicionário de dados** (ver seção [Dicionário de Dados](#-dicionário-de-dados)).
+
+---
+
+## 🛠 Pré-requisitos
 
 - Python 3.12+
 - uv (gerenciador de pacotes Python)
 - Jupyter (execução de notebooks)
 - Quarto (renderização de relatórios `.qmd`)
 - Git
-
----
-
-# ⚙️ Configuração do Ambiente
-
-### 1. Clonar o repositório
-
-```bash
-git clone https://github.com/danzz32/data-science-project.git
-cd data-science-project
-```
-
-### 2. Criar e ativar o ambiente virtual
-
-```bash
-uv venv
-source .venv/bin/activate  # Linux/macOS
-# ou
-.venv\Scripts\activate  # Windows
-```
-
-### 3. Instalar dependências
-
-```bash
-uv sync
-```
-
-### 4. Configurar Jupyter (opcional)
-
-```bash
-uv pip install jupyter ipykernel notebook
-uv run python -m ipykernel install --user --name=data-science-project
-```
-
----
-
-# 🔐 Variáveis de Ambiente
-
-O gerenciamento de configurações é feito através de variáveis de ambiente. Para configurar seu ambiente:
-
-```bash
-cp .env.example .env
-```
-
-Para a etapa inicial de ingestão (download dos dados públicos da PRF), nenhuma variável de ambiente ou chave de API é necessária.
-
----
-
-# ▶️ Execução do Projeto
-
-### 1. Executar a Ingestão (Camada Raw)
-
-```bash
-uv run src/ingest.py
-```
-
-A camada Raw armazena os dados em sua forma original, íntegra e imutável, servindo como fonte de verdade para todas as transformações posteriores.
-
-### 2. Executar o Pipeline de Qualidade e Transformação (Camada Trusted)
-
-```bash
-uv run src/transform.py
-```
-
-A camada Trusted contém os dados após validação de qualidade, tratamento de inconsistências e transformações estruturais necessárias para análise.
-
-### 3. Executar Relatórios Quarto (.qmd)
-
-Os relatórios podem ser executados no VS Code ou via terminal:
-
-```bash
-quarto render relatorio.qmd
-```
-
----
-
-# 📈 Resultado Esperado
-
-<div align="justify">
-Ao final da execução deste projeto, espera-se a geração de:
-
-1. **Mapas de Calor Interativos**: Visualizações geográficas que identifiquem os trechos de rodovias com maior densidade de acidentes (hotspots).
-
-2. **Análise de Periculosidade**: Identificação estatística dos fatores que mais contribuem para a gravidade das ocorrências (ex: relação entre condições climáticas e óbitos).
-
-3. **Séries Temporais**: Gráficos que demonstrem os períodos de maior vulnerabilidade (feriados, horários de pico ou sazonalidade mensal).
-
-4. **Relatório Consolidado**: Um conjunto de insights que correlacionam a infraestrutura viária do estado com o comportamento dos sinistros registrados pela PRF.
-</div>
-
----
-
-# 📁 Estrutura do Projeto
-
-```
-data-science-project/
-├── src/
-│   ├── ingest.py          # Ingestão de dados (camada Raw)
-│   ├── transform.py       # Transformação de dados (camada Trusted)
-│   └── ...
-├── docs/             # Análises exploratórias
-├── reports/               # Relatórios Quarto (.qmd)
-├── schemas/
-├── data/
-│   ├── raw/              # Dados brutos (imutáveis)
-│   ├── trusted/          # Dados transformados e validados
-│   └── processed/        # Dados para análise final
-├── .env.example
-└── pyproject.toml         # Dependências do projeto
-```
-
----
-
-# 📚 Referências
-
-- Dados abertos PRF: https://www.gov.br/prf/pt-br/acesso-a-informacao/dados-abertos/dados-abertos-da-prf
-- Documentação uv: https://docs.astral.sh/uv/
-- Documentação Quarto: https://quarto.org/
-# Mapeamento e Análise Espacial de Acidentes em Rodovias Federais (PRF)
-
-## 📌 DESCRIÇÃO
-
-<div align="justify">
-Este repositório contém o projeto prático desenvolvido para a disciplina de Introdução à Ciência de Dados do curso de Mestrado em Computação Aplicada. O objetivo principal é aplicar técnicas de análise espacial e visualização de dados para investigar padrões de ocorrências em rodovias federais brasileiras.
-
-O projeto utiliza a base de dados abertos da Polícia Rodoviária Federal (PRF) (https://www.gov.br/prf/pt-br/acesso-a-informacao/dados-abertos/dados-abertos-da-prf), escolhida pela sua expressiva riqueza de variáveis físicas, temporais e geográficas (latitude e longitude nativas).
-
-O foco analítico principal deste estudo está no recorte regional do estado do Maranhão, buscando extrair insights sobre a dinâmica dos acidentes de trânsito na região.
-</div>
-
----
-
-# 🛠 Pré-requisitos
-
-<div align="justify">
-Para gerenciamento do ambiente virtual e dependências, este projeto utiliza o <b>uv</b>, um gerenciador de pacotes Python extremamente rápido desenvolvido em Rust.
-
-Além disso, para execução de notebooks e relatórios analíticos, utilizamos:
-</div>
-
-- Python 3.12+
-- Jupyter
-- Quarto
 - Visual Studio Code (recomendado)
 
 ---
 
-# ⚙️ Configuração do Ambiente de Desenvolvimento
+## ⚙️ Configuração do Ambiente de Desenvolvimento
 
-## 🐍 Instalação do Python
+### 🐍 Instalação do Python
 
 Verifique se o Python já está instalado:
 
 ```bash
 python --version
-```
-
-ou:
-
-```bash
+# ou
 py --version
 ```
 
@@ -187,145 +70,91 @@ Caso não esteja instalado:
 - Windows: https://www.python.org/downloads/windows/
 - Linux/macOS: utilizar o gerenciador de pacotes da distribuição.
 
----
+### ⚡ Instalação do uv
 
-# ⚡ Instalação do uv
-
-## Windows (PowerShell)
+**Windows (PowerShell):**
 
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-## Linux/macOS
+**Linux/macOS:**
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-## Verificar instalação
+Verificar instalação:
 
 ```bash
 uv --version
 ```
 
----
-
-# 📥 Clonar o Repositório
+### 📥 Clonar o repositório
 
 ```bash
 git clone https://github.com/danzz32/data-science-project.git
-```
-
-Entrar na pasta:
-
-```bash
 cd data-science-project
 ```
 
----
-
-# 📦 Criação do Ambiente Virtual
+### 📦 Criar e ativar o ambiente virtual
 
 ```bash
 uv venv
+source .venv/bin/activate  # Linux/macOS
+# ou
+.venv\Scripts\activate     # Windows (PowerShell)
 ```
 
----
+> Caso o PowerShell bloqueie a execução do script de ativação:
+> ```powershell
+> Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+> ```
 
-# ▶️ Ativação do Ambiente Virtual
-
-## Windows (PowerShell)
-
-Caso o PowerShell bloqueie scripts:
-
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
-
-Depois ative o ambiente:
-
-```powershell
-.venv\Scripts\activate
-```
-
-## Linux/macOS
-
-```bash
-source .venv/bin/activate
-```
-
----
-
-# 📚 Instalação das Dependências
-
-Instalar todas as dependências do projeto:
+### 📚 Instalar dependências
 
 ```bash
 uv sync
 ```
 
----
-
-# 📓 Instalação do Jupyter
-
-## Instalar Jupyter e Kernel Python
+### 📓 Configurar Jupyter (opcional)
 
 ```bash
 uv pip install jupyter ipykernel notebook
-```
-
-## Registrar Kernel do Projeto
-
-```bash
 uv run python -m ipykernel install --user --name=data-science-project
 ```
 
-Após isso, o kernel poderá ser selecionado no VS Code/Jupyter.
-
----
-
-# 📝 Instalação do Quarto
+### 📝 Instalar Quarto
 
 O Quarto é utilizado para execução e renderização dos relatórios `.qmd`.
 
-## Windows (PowerShell)
-
+**Windows (PowerShell):**
 ```powershell
 winget install --id Posit.Quarto -e
 ```
 
-## Linux
-
-### Ubuntu/Debian
-
+**Ubuntu/Debian:**
 ```bash
 sudo apt install quarto
 ```
 
-### Fedora
-
+**Fedora:**
 ```bash
 sudo dnf install quarto
 ```
 
-## macOS
-
+**macOS:**
 ```bash
 brew install quarto
 ```
 
-## Verificar instalação
+Verificar instalação:
 
 ```bash
 quarto --version
 ```
 
----
-
-# 🧩 Extensões Recomendadas do VS Code
-
-Instale as seguintes extensões:
+### 🧩 Extensões recomendadas do VS Code
 
 | Extensão | Finalidade |
 |---|---|
@@ -335,69 +164,111 @@ Instale as seguintes extensões:
 
 ---
 
-# ▶️ Configuração do Kernel no VS Code
-
-1. Abra o projeto no VS Code
-2. Abra um arquivo `.ipynb` ou `.qmd`
-3. Clique em `Select Kernel`
-4. Escolha:
-   - `data-science-project`
-   - ou o interpretador Python da pasta `.venv`
-
----
-
-# 📄 Execução de Relatórios Quarto (.qmd)
-
-Exemplo de bloco executável:
-
-````markdown
-```{python}
-print("Olá mundo")
-```
-
-## 🚀 Como executar
-
-1. Para baixar do repositório:
-```bash
-   git clone https://github.com/danzz32/data-science-project.git
-```
-2. Para sincronizar as dependências do projeto:
-```bash
-   uv syncgit branch
-```
-3. Executar a Ingestão (Camada Raw):
-```bash
-   uv run src/ingest.py
-```
-4. Executar o Pipeline de Qualidade e Transformação (Camada Trusted):
-```bash
-uv run python src/transform.py
-```
 ## 🔐 Variáveis de Ambiente
+
 <div align="justify">
-O gerenciamento de configurações e credenciais locais é feito através de variáveis de ambiente. Este projeto inclui um arquivo de modelo para facilitar essa configuração.
-Para configurar o seu ambiente, faça uma cópia do arquivo de exemplo executando o comando abaixo no seu terminal:
+O gerenciamento de configurações é feito através de variáveis de ambiente. Para configurar seu ambiente, faça uma cópia do arquivo de exemplo:
 </div>
 
 ```bash
 cp .env.example .env
 ```
-<div align="justify">
-Em seguida, abra o arquivo .env recém-criado na raiz do projeto e preencha as informações (se necessário).
-Variáveis utilizadas no projeto:
-Nesta etapa inicial de ingestão (download dos dados públicos da PRF), nenhuma variável de ambiente ou chave de API foi necessária. O script funcionará perfeitamente apenas com as configurações padrão.
-</div>
+
+Para a etapa inicial de ingestão (download dos dados públicos da PRF), nenhuma variável de ambiente ou chave de API é necessária. O script funciona apenas com as configurações padrão.
+
+---
+
+## ▶️ Execução do Projeto
+
+### 1. Ingestão (Camada Raw)
+
+```bash
+uv run python src/ingest.py
+```
+
+A camada Raw armazena os dados em sua forma original, íntegra e imutável, servindo como fonte de verdade para todas as transformações posteriores.
+
+### 2. Qualidade e Transformação (Camada Trusted)
+
+```bash
+uv run python src/transform.py
+```
+
+A camada Trusted contém os dados após validação de qualidade, tratamento de inconsistências e transformações estruturais necessárias para análise.
+
+### 3. Construção do Modelo Dimensional (Camada Mart)
+
+```bash
+uv run python src/build_mart.py
+```
+
+Etapa responsável por estruturar os dados da camada Trusted no modelo dimensional (fato + dimensões) descrito na seção [Modelo Dimensional](#-modelo-dimensional), utilizando DuckDB. As tabelas (`dim_calendario`, `dim_localidade`, `dim_envolvido` e `fato_acidentes_veiculos`) são persistidas em formato Parquet em `data/mart/`, e um resumo de volumetria (quantidade de linhas por tabela) é impresso ao final da execução.
+
+### 4. Notebooks de Análise Exploratória
+
+Os notebooks de análise exploratória ficam em [`docs/`](./docs) e podem ser executados via VS Code/Jupyter selecionando o kernel:
+
+```bash
+uv run jupyter notebook docs/
+```
+
+No VS Code: abra o arquivo `.ipynb`, clique em **Select Kernel** e escolha `data-science-project` (ou o interpretador da pasta `.venv`).
+
+### 5. Relatórios Quarto (.qmd)
+
+Os relatórios `.qmd` ficam em [`reports/`](./reports) e podem ser renderizados via VS Code ou terminal:
+
+```bash
+quarto render reports/relatorio.qmd
+```
+
+A renderização gera o relatório final em HTML em [`reports/`](./reports) (ex.: `reports/relatorio.html`), contendo os mapas de calor interativos, gráficos e demais visualizações.
+
+---
 
 ## 📈 Resultado Esperado
 
 <div align="justify">
 Ao final da execução deste projeto, espera-se a geração de:
 
-1.	Mapas de Calor Interativos: Visualizações geográficas que identifiquem os trechos de rodovias com maior densidade de acidentes (hotspots).
+1. **Mapas de Calor Interativos**: Visualizações geográficas que identifiquem os trechos de rodovias com maior densidade de acidentes (hotspots).
+2. **Análise de Periculosidade**: Identificação estatística dos fatores que mais contribuem para a gravidade das ocorrências (ex: relação entre condições climáticas e óbitos).
+3. **Séries Temporais**: Gráficos que demonstrem os períodos de maior vulnerabilidade (feriados, horários de pico ou sazonalidade mensal).
+4. **Relatório Consolidado**: Um conjunto de insights que correlacionam a infraestrutura viária do estado com o comportamento dos sinistros registrados pela PRF.
+</div>
 
-2.	Análise de Periculosidade: Identificação estatística dos fatores que mais contribuem para a gravidade das ocorrências (ex: relação entre condições climáticas e óbitos).
+---
 
-3.	Séries Temporais: Gráficos que demonstrem os períodos de maior vulnerabilidade (feriados, horários de pico ou sazonalidade mensal).
+## 📖 Dicionário de Dados
 
-4.	Relatório Consolidado: Um conjunto de insights que correlacionam a infraestrutura viária do estado com o comportamento dos sinistros registrados pela PRF.
-<div>
+O dicionário de dados, com a descrição de cada coluna, tipo, domínio e regra de derivação das tabelas fato e dimensão, está disponível em [`schemas/`](./schemas).
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+data-science-project/
+├── src/
+│   ├── ingest.py           # Ingestão de dados (camada Raw)
+│   ├── transform.py        # Transformação de dados (camada Trusted)
+│   ├── build_mart.py       # Construção do modelo dimensional (camada Mart)
+│   └── ...
+├── docs/                   # Notebooks de análise exploratória (.ipynb)
+├── reports/                # Relatórios Quarto (.qmd) e saída renderizada (.html)
+├── schemas/                # Dicionário de dados
+├── data/
+│   ├── raw/                # Dados brutos (imutáveis)
+│   ├── trusted/            # Dados transformados e validados
+│   └── mart/               # Modelo dimensional (fato + dimensões), Parquet
+├── .env.example
+└── pyproject.toml          # Dependências do projeto
+```
+
+---
+
+## 📚 Referências
+
+- Dados abertos PRF: https://www.gov.br/prf/pt-br/acesso-a-informacao/dados-abertos/dados-abertos-da-prf
+- Documentação uv: https://docs.astral.sh/uv/
+- Documentação Quarto: https://quarto.org/
