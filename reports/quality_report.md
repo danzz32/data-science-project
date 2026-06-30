@@ -1,43 +1,40 @@
-<<<<<<< HEAD
-# Relatório de Qualidade de Dados - Camada Trusted
-**Data de Execução:** 2026-05-26 00:31:36
-**Estratégia Adotada:** Quarentena Seletiva + Correção Automática de Formatos
+# Síntese Executiva: Relatório de Qualidade de Dados (Camada Trusted)
 
-## Resumo da Execução (Linhas)
-* **Total de Registos Lidos (Raw):** 342624
-* **Total Aprovados na Validação:** 342624
-* **Total Enviados para Quarentena:** 0
+**Período de Referência:** Maio a Junho de 2026
+**Arquitetura e Estratégia:** Processamento vetorizado de alta performance (DuckDB) aliado a Quarentena Seletiva e Correção Automática de Formatos.
 
-## Correções Automáticas Aplicadas (Dados Salvos do Descarte) ✔️
-* **Formatos de Data Corrigidos (Invertidos para Padrão):** 342624 registos salvos
-* **Contradições Vitimológicas Ajustadas (Morto & Ileso):** 13389 registos salvos
+---
 
-## Eficiência de Armazenamento (CSV vs Parquet)
-* **Tamanho do Ficheiro Original (CSV):** 85.37 MB
-* **Tamanho do Ficheiro Destino (Parquet Trusted):** 13.44 MB
-* **Percentual de Redução de Espaço:** **84.26%** de economia em disco 📉
+## 📊 1. Resumo Geral de Execução (Volume e Qualidade)
 
-## Motivos de Quarentena por Categoria (Erros Críticos)
-* **Duplicatas Exatas:** 0 registos
-* **Temporalidade (Datas totalmente corrompidas/ilegíveis):** 0 registos
-* **Acurácia (UF inválida):** 0 registos
-* **Consistência (Dados contraditórios irrecuperáveis):** 0 registos
-* **Completude (Município nulo):** 0 registos
-=======
-# Relatório de Qualidade de Dados - Camada Trusted (DuckDB Motor)
-**Data de Execução:** 2026-06-21 11:41:07
-**Estratégia Computacional:** Arquitetura Vetorizada de Alta Performance com DuckDB
+* **Total de Registos Processados (Raw):** 3.044.628 registos
+  * *Lote 1 (Maio):* 342.624 registos
+  * *Lote 2 (Junho):* 2.702.004 registos
+* **Total Aprovados pelo Pipeline:** 3.044.628 registos (**100% de aproveitamento**)
+* **Total Isolados na Quarentena:** 0 registos
 
-## Resumo da Execução (Linhas)
-* **Total de Registros Lidos (Layer Raw):** 2,702,004
-* **Total Aprovados pelo Pipeline:** 2,702,004
-* **Total Isolados na Quarentena:** 0
+Com a estratégia aplicada, nenhum registo foi retido por falhas críticas de integridade, como duplicados exatos, problemas graves de temporalidade, inconsistências geográficas (UF inválida) ou chaves nulas (Município/ID).
 
-## Eficiência de Armazenamento e Compressão 📉
-* **Tamanho do Arquivo Bruto (CSV):** 986.75 MB
-* **Tamanho do Arquivo Otimizado (Parquet Trusted):** 31.53 MB
-* **Ganho de Economia em Disco:** **96.80%** reduzidos com codificação Parquet e Compressão Snappy
+---
 
-## Detalhamento de Erros de Quarentena
-* **Falhas Críticas de Parsing (ID ou Data Nula):** 0 registros
->>>>>>> 0dd1dc22f33a32648db475cb4785a79ef073fed3
+## 🛠️ 2. Engenharia de Dados e Resgate Automático
+
+A aplicação de algoritmos de correção automática salvou milhares de registos do descarte prematuro, aumentando a completude da base tratada:
+
+* **Padronização Temporal:** **342.624 registos corrigidos** através da inversão automática de formatos de data para o padrão do pipeline.
+* **Consistência Vitimológica:** **13.389 registos ajustados** devido a contradições lógicas (ex: reconciliação de status simultâneos de "Morto & Ileso").
+
+---
+
+## 📉 3. Eficiência de Armazenamento e Infraestrutura
+
+A transição do modelo bruto em texto plano (CSV) para o formato colunar otimizado (Parquet) com compressão de alta performance (Snappy/DuckDB) gerou ganhos massivos na infraestrutura de disco:
+
+### Métricas Acumuladas
+* **Tamanho Total do Ficheiro Bruto (CSV):** 1.072,12 MB (~1,07 GB)
+* **Tamanho Total do Ficheiro Otimizado (Parquet Trusted):** 44,97 MB (~45 MB)
+* **Percentagem Média de Redução:** **95,81% de economia global** em armazenamento.
+
+### Detalhamento por Lote
+* **Lote 1 (Estratégia Tradicional):** Redução de **84,26%** (de 85,37 MB para 13,44 MB).
+* **Lote 2 (Motor DuckDB Vetorizado):** Redução de **96,80%** (de 986,75 MB para 31,53 MB) devido à maior eficiência de codificação e compressão Snappy.
