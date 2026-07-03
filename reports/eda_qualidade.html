@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Danilo Monteiro, Fábio Batalha e Gabriel Camargo">
+<meta name="dcterms.date" content="2026-05-23">
+
+<title>EDA de Qualidade de Dados - PRF 191 (Sprint 2)</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="eda_qualidade_files/libs/clipboard/clipboard.min.js"></script>
+<script src="eda_qualidade_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="eda_qualidade_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="eda_qualidade_files/libs/quarto-html/popper.min.js"></script>
+<script src="eda_qualidade_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="eda_qualidade_files/libs/quarto-html/anchor.min.js"></script>
+<link href="eda_qualidade_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="eda_qualidade_files/libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="eda_qualidade_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="eda_qualidade_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="eda_qualidade_files/libs/bootstrap/bootstrap-67270d1595a62d14f123c043d4fb2f18.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+<script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@*/dist/embed-amd.js" crossorigin="anonymous"></script>
+
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Índice</h2>
+   
+  <ul>
+  <li><a href="#introdução" id="toc-introdução" class="nav-link active" data-scroll-target="#introdução">Introdução</a>
+  <ul class="collapse">
+  <li><a href="#setup-e-carregamento" id="toc-setup-e-carregamento" class="nav-link" data-scroll-target="#setup-e-carregamento">Setup e Carregamento</a></li>
+  </ul></li>
+  <li><a href="#dimensão-completude" id="toc-dimensão-completude" class="nav-link" data-scroll-target="#dimensão-completude">1. Dimensão: Completude</a></li>
+  <li><a href="#dimensão-consistência" id="toc-dimensão-consistência" class="nav-link" data-scroll-target="#dimensão-consistência">2. Dimensão: Consistência</a></li>
+  <li><a href="#configuração-de-caminhos-dinâmicos" id="toc-configuração-de-caminhos-dinâmicos" class="nav-link" data-scroll-target="#configuração-de-caminhos-dinâmicos">1. Configuração de caminhos dinâmicos</a></li>
+  <li><a href="#dimensão-acurácia" id="toc-dimensão-acurácia" class="nav-link" data-scroll-target="#dimensão-acurácia">3. Dimensão: Acurácia</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">EDA de Qualidade de Dados - PRF 191 (Sprint 2)</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Danilo Monteiro, Fábio Batalha e Gabriel Camargo </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 23, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="introdução" class="level1">
+<h1>Introdução</h1>
+<p>Este notebook tem como objetivo documentar o perfil de qualidade dos dados brutos de acidentes da PRF (camada <code>raw/</code>). O diagnóstico guiará as decisões de tratamento que serão implementadas no script <code>transform.py</code>. A análise está dividida nas quatro dimensões de Batini et al.&nbsp;(2009): Completude, Consistência, Acurácia e Temporalidade.</p>
+<section id="setup-e-carregamento" class="level2">
+<h2 class="anchored" data-anchor-id="setup-e-carregamento">Setup e Carregamento</h2>
+<div id="e9c5ca16" class="cell" data-execution_count="1">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> duckdb</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🦅 Inicializando DuckDB para Análise Exploratória Bruta (Camada RAW)..."</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Configuração de caminhos dinâmicos</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>PROJECT_ROOT <span class="op">=</span> Path(os.getcwd()).resolve().parent</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>RAW_DIR <span class="op">=</span> PROJECT_ROOT <span class="op">/</span> <span class="st">"data"</span> <span class="op">/</span> <span class="st">"raw"</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Localiza o arquivo CSV mais recente gerado pelo ingest</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>arquivos_csv <span class="op">=</span> <span class="bu">list</span>(RAW_DIR.glob(<span class="st">"prf_191_*.csv"</span>))</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> arquivos_csv:</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    PATH_CSV_BRUTO <span class="op">=</span> arquivos_csv[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"📁 Arquivo localizado: </span><span class="sc">{</span>PATH_CSV_BRUTO<span class="sc">.</span>name<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Abre a conexão do DuckDB em memória</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    con <span class="op">=</span> duckdb.<span class="ex">connect</span>(database<span class="op">=</span><span class="st">':memory:'</span>)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Criamos uma VIEW temporária no DuckDB para não precisar repetir o read_csv_auto em cada query</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    con.execute(<span class="ss">f"""</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="ss">        CREATE OR REPLACE VIEW v_prf_bruto AS </span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="ss">        SELECT * FROM read_csv_auto('</span><span class="sc">{</span>PATH_CSV_BRUTO<span class="sc">}</span><span class="ss">', delim=';', encoding='latin-1');</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="ss">    """</span>)</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2. Mapeando e exibindo o Schema detectado automaticamente</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">📋 [Etapa 1.1] Esquema de Colunas e Tipos Identificados pelo DuckDB:"</span>)</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    schema_df <span class="op">=</span> con.execute(<span class="st">"DESCRIBE v_prf_bruto;"</span>).df()</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    display(schema_df[[<span class="st">'column_name'</span>, <span class="st">'column_type'</span>]])</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3. Análise dos Identificadores Estruturais Usados nos Registros</span></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">🔍 [Etapa 1.2] Análise dos Identificadores (Chaves Logísticas) presentes na Base:"</span>)</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Query para avaliar o comportamento e cardinalidade dos IDs principais</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    chaves_analise <span class="op">=</span> con.execute(<span class="st">"""</span></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="st">        SELECT </span></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="st">            COUNT(DISTINCT id) as acidentes_unicos,</span></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="st">            COUNT(DISTINCT id_veiculo) as veiculos_unicos,</span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a><span class="st">            COUNT(*) as total_linhas_pessoas</span></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="st">        FROM v_prf_bruto;</span></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="st">    """</span>).df()</span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Formatando a saída para exibição limpa</span></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"   • ID do Acidente (Ocorrência) : </span><span class="sc">{</span>chaves_analise[<span class="st">'acidentes_unicos'</span>]<span class="sc">.</span>values[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> chaves únicas."</span>.replace(<span class="st">','</span>, <span class="st">'.'</span>))</span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"   • ID do Veículo               : </span><span class="sc">{</span>chaves_analise[<span class="st">'veiculos_unicos'</span>]<span class="sc">.</span>values[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> frotas únicas identificadas."</span>.replace(<span class="st">','</span>, <span class="st">'.'</span>))</span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"   • Linhas Totais (Pessoas)     : </span><span class="sc">{</span>chaves_analise[<span class="st">'total_linhas_pessoas'</span>]<span class="sc">.</span>values[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> registros de envolvidos."</span>.replace(<span class="st">','</span>, <span class="st">'.'</span>))</span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 4. Volumetria Geral Bruta</span></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">📊 Volumetria Total na Camada RAW: </span><span class="sc">{</span>chaves_analise[<span class="st">'total_linhas_pessoas'</span>]<span class="sc">.</span>values[<span class="dv">0</span>]<span class="sc">:,}</span><span class="ss"> registros (linhas por pessoa/envolvido)."</span>.replace(<span class="st">','</span>, <span class="st">'.'</span>))</span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"❌ Erro: Nenhum arquivo CSV 'prf_geral_bruto_*.csv' foi localizado em </span><span class="sc">{</span>RAW_DIR<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>🦅 Inicializando DuckDB para Análise Exploratória Bruta (Camada RAW)...
+📁 Arquivo localizado: prf_191_2026-07-03.csv
+
+📋 [Etapa 1.1] Esquema de Colunas e Tipos Identificados pelo DuckDB:</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">column_name</th>
+<th data-quarto-table-cell-role="th">column_type</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>id</td>
+<td>BIGINT</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>pesid</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>data_inversa</td>
+<td>DATE</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>dia_semana</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>horario</td>
+<td>TIME</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5</th>
+<td>uf</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>br</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">7</th>
+<td>km</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">8</th>
+<td>municipio</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">9</th>
+<td>causa_principal</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">10</th>
+<td>causa_acidente</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">11</th>
+<td>ordem_tipo_acidente</td>
+<td>BIGINT</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">12</th>
+<td>tipo_acidente</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">13</th>
+<td>classificacao_acidente</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">14</th>
+<td>fase_dia</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">15</th>
+<td>sentido_via</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">16</th>
+<td>condicao_metereologica</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">17</th>
+<td>tipo_pista</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">18</th>
+<td>tracado_via</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">19</th>
+<td>uso_solo</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">20</th>
+<td>id_veiculo</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">21</th>
+<td>tipo_veiculo</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">22</th>
+<td>marca</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">23</th>
+<td>ano_fabricacao_veiculo</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">24</th>
+<td>tipo_envolvido</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">25</th>
+<td>estado_fisico</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">26</th>
+<td>idade</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">27</th>
+<td>sexo</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">28</th>
+<td>ilesos</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">29</th>
+<td>feridos_leves</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">30</th>
+<td>feridos_graves</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">31</th>
+<td>mortos</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">32</th>
+<td>latitude</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">33</th>
+<td>longitude</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">34</th>
+<td>regional</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">35</th>
+<td>delegacia</td>
+<td>VARCHAR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">36</th>
+<td>uop</td>
+<td>VARCHAR</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+🔍 [Etapa 1.2] Análise dos Identificadores (Chaves Logísticas) presentes na Base:
+   • ID do Acidente (Ocorrência) : 342.626 chaves únicas.
+   • ID do Veículo               : 653.123 frotas únicas identificadas.
+   • Linhas Totais (Pessoas)     : 2.702.004 registros de envolvidos.
+
+📊 Volumetria Total na Camada RAW: 2.702.004 registros (linhas por pessoa/envolvido).</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="dimensão-completude" class="level1">
+<h1>1. Dimensão: Completude</h1>
+<p><strong>Objetivo:</strong> Identificar campos com valores ausentes (nulos), a proporção de falta e se existe algum padrão.</p>
+<div id="fcf69e94" class="cell" data-execution_count="2">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> duckdb</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"🎯 Iniciando Diagnóstico de Completude e Repetição de Identificadores...</span><span class="ch">\n</span><span class="st">"</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Configuração de caminhos dinâmicos</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>PROJECT_ROOT <span class="op">=</span> Path(os.getcwd()).resolve().parent</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>RAW_DIR <span class="op">=</span> PROJECT_ROOT <span class="op">/</span> <span class="st">"data"</span> <span class="op">/</span> <span class="st">"raw"</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>arquivos_csv <span class="op">=</span> <span class="bu">list</span>(RAW_DIR.glob(<span class="st">"prf_191_*.csv"</span>))</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> arquivos_csv:</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    PATH_CSV_BRUTO <span class="op">=</span> arquivos_csv[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    con <span class="op">=</span> duckdb.<span class="ex">connect</span>(database<span class="op">=</span><span class="st">':memory:'</span>)</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Cria a view mestre no DuckDB para otimizar as queries</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    con.execute(<span class="ss">f"""</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="ss">        CREATE OR REPLACE VIEW v_prf_bruto AS </span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="ss">        SELECT * FROM read_csv_auto('</span><span class="sc">{</span>PATH_CSV_BRUTO<span class="sc">}</span><span class="ss">', delim=';', encoding='latin-1', all_varchar=True);</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="ss">    """</span>)</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Detecta qual é a coluna de identificação de pessoas disponível</span></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    colunas_disponiveis <span class="op">=</span> [col[<span class="dv">0</span>] <span class="cf">for</span> col <span class="kw">in</span> con.execute(<span class="st">"DESCRIBE v_prf_bruto;"</span>).fetchall()]</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>    col_pessoa <span class="op">=</span> <span class="st">'pesid'</span> <span class="cf">if</span> <span class="st">'pesid'</span> <span class="kw">in</span> colunas_disponiveis <span class="cf">else</span> (<span class="st">'id_envolvido'</span> <span class="cf">if</span> <span class="st">'id_envolvido'</span> <span class="kw">in</span> colunas_disponiveis <span class="cf">else</span> <span class="va">None</span>)</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>    <span class="co"># =====================================================================</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    <span class="co"># PARTE 1: CONTADOR DE REPETIÇÃO DOS IDENTIFICADORES (Granularidade)</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>    <span class="co"># =====================================================================</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"🔄 [Análise de Repetição] Avaliando a frequência de chaves no dataset geral:"</span>)</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>    query_repeticao <span class="op">=</span> <span class="st">"""</span></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a><span class="st">        WITH freq_acidentes AS (</span></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a><span class="st">            SELECT id, COUNT(*) as qtd FROM v_prf_bruto GROUP BY id</span></span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a><span class="st">        ),</span></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="st">        freq_veiculos AS (</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a><span class="st">            SELECT id_veiculo, COUNT(*) as qtd FROM v_prf_bruto WHERE id_veiculo IS NOT NULL AND id_veiculo != '0' GROUP BY id_veiculo</span></span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a><span class="st">        )</span></span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a><span class="st">    """</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> col_pessoa:</span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>        query_repeticao <span class="op">+=</span> <span class="ss">f""",</span></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a><span class="ss">        freq_pessoas AS (</span></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a><span class="ss">            SELECT </span><span class="sc">{</span>col_pessoa<span class="sc">}</span><span class="ss">, COUNT(*) as qtd FROM v_prf_bruto GROUP BY </span><span class="sc">{</span>col_pessoa<span class="sc">}</span></span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="ss">        )</span></span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a><span class="ss">        """</span></span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a>    query_repeticao <span class="op">+=</span> <span class="st">"""</span></span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a><span class="st">        SELECT </span></span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a><span class="st">            (SELECT AVG(qtd) FROM freq_acidentes) as avg_acidente,</span></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a><span class="st">            (SELECT MAX(qtd) FROM freq_acidentes) as max_acidente,</span></span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a><span class="st">            (SELECT AVG(qtd) FROM freq_veiculos) as avg_veiculo,</span></span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a><span class="st">            (SELECT MAX(qtd) FROM freq_veiculos) as max_veiculo</span></span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a><span class="st">    """</span></span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> col_pessoa:</span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a>        query_repeticao <span class="op">+=</span> <span class="st">""",</span></span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a><span class="st">            (SELECT AVG(qtd) FROM freq_pessoas) as avg_pessoa,</span></span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a><span class="st">            (SELECT MAX(qtd) FROM freq_pessoas) as max_pessoa;</span></span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a><span class="st">        """</span></span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a>        query_repeticao <span class="op">+=</span> <span class="st">""",</span></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a><span class="st">            1.0 as avg_pessoa,</span></span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a><span class="st">            1 as max_pessoa;</span></span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a><span class="st">        """</span></span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a>    frequencia_ids <span class="op">=</span> con.execute(query_repeticao).df()</span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Valores extraídos para variáveis locais para prevenir qualquer quebra sintática de f-string longa</span></span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>    avg_ac, max_ac <span class="op">=</span> frequencia_ids[<span class="st">'avg_acidente'</span>].values[<span class="dv">0</span>], frequencia_ids[<span class="st">'max_acidente'</span>].values[<span class="dv">0</span>]</span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a>    avg_vc, max_vc <span class="op">=</span> frequencia_ids[<span class="st">'avg_veiculo'</span>].values[<span class="dv">0</span>], frequencia_ids[<span class="st">'max_veiculo'</span>].values[<span class="dv">0</span>]</span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"   • ID do Acidente : Média </span><span class="sc">{</span>avg_ac<span class="sc">:.2f}</span><span class="ss"> linhas/ocorrência (Máx: </span><span class="sc">{</span>max_ac<span class="sc">}</span><span class="ss">)."</span>)</span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"   • ID do Veículo  : Média </span><span class="sc">{</span>avg_vc<span class="sc">:.2f}</span><span class="ss"> linhas/veículo (Máx: </span><span class="sc">{</span>max_vc<span class="sc">}</span><span class="ss">)."</span>)</span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> col_pessoa:</span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a>        avg_ps, max_ps <span class="op">=</span> frequencia_ids[<span class="st">'avg_pessoa'</span>].values[<span class="dv">0</span>], frequencia_ids[<span class="st">'max_pessoa'</span>].values[<span class="dv">0</span>]</span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"   • ID da Pessoa ('</span><span class="sc">{</span>col_pessoa<span class="sc">}</span><span class="ss">'): Média </span><span class="sc">{</span>avg_ps<span class="sc">:.2f}</span><span class="ss"> linhas/indivíduo (Máx: </span><span class="sc">{</span>max_ps<span class="sc">}</span><span class="ss">)."</span>)</span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>    <span class="co"># =====================================================================</span></span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a>    <span class="co"># PARTE 2: VISÃO GERAL DA COMPLETUDE (Percentual de Nulos por Coluna)</span></span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a>    <span class="co"># =====================================================================</span></span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">📊 [Completude] Calculando a taxa de preenchimento e ausência por coluna..."</span>)</span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Captura o total de linhas para o cálculo percentual</span></span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a>    total_linhas <span class="op">=</span> con.execute(<span class="st">"SELECT COUNT(*) FROM v_prf_bruto;"</span>).fetchone()[<span class="dv">0</span>]</span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"   • Volume de amostragem: </span><span class="sc">{</span>total_linhas<span class="sc">:,}</span><span class="ss"> linhas analisadas."</span>.replace(<span class="st">','</span>, <span class="st">'.'</span>))</span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Construção dinâmica da query de contagem de nulos para cada coluna (detecta vazios, nulos e 'NA')</span></span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a>    select_nulos <span class="op">=</span> <span class="st">", "</span>.join([<span class="ss">f"COUNT(CASE WHEN </span><span class="sc">{</span>col<span class="sc">}</span><span class="ss"> IS NULL OR </span><span class="sc">{</span>col<span class="sc">}</span><span class="ss"> = '' OR </span><span class="sc">{</span>col<span class="sc">}</span><span class="ss"> = 'NA' THEN 1 END) as </span><span class="sc">{</span>col<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> col <span class="kw">in</span> colunas_disponiveis])</span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a>    df_contagem_nulos <span class="op">=</span> con.execute(<span class="ss">f"SELECT </span><span class="sc">{</span>select_nulos<span class="sc">}</span><span class="ss"> FROM v_prf_bruto;"</span>).df()</span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Transpõe o resultado para estruturar o DataFrame de ranking de completude</span></span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a>    df_nulos <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a>        <span class="st">'Total_Nulos'</span>: df_contagem_nulos.iloc[<span class="dv">0</span>].values,</span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a>        <span class="st">'Percentual_Nulos (%)'</span>: (df_contagem_nulos.iloc[<span class="dv">0</span>].values <span class="op">/</span> total_linhas) <span class="op">*</span> <span class="dv">100</span></span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a>    }, index<span class="op">=</span>colunas_disponiveis).sort_values(by<span class="op">=</span><span class="st">'Total_Nulos'</span>, ascending<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Cópia formatada para exibição no Quarto/Notebook (Garantindo o sinal de %)</span></span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a>    df_nulos_view <span class="op">=</span> df_nulos.copy()</span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a>    df_nulos_view[<span class="st">'Percentual_Nulos (%)'</span>] <span class="op">=</span> df_nulos_view[<span class="st">'Percentual_Nulos (%)'</span>].<span class="bu">map</span>(<span class="st">'</span><span class="sc">{:.2f}</span><span class="st">%'</span>.<span class="bu">format</span>)</span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a>    df_nulos_view[<span class="st">'Total_Nulos'</span>] <span class="op">=</span> df_nulos_view[<span class="st">'Total_Nulos'</span>].<span class="bu">map</span>(<span class="st">'</span><span class="sc">{:,}</span><span class="st">'</span>.<span class="bu">format</span>).<span class="bu">str</span>.replace(<span class="st">','</span>, <span class="st">'.'</span>)</span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">📋 Tabela Completa de Completude (Todas as Colunas do Dataset Bruto):"</span>)</span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a>    display(df_nulos_view)</span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a>    <span class="co"># =====================================================================</span></span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a>    <span class="co"># PARTE 3: INVESTIGAÇÃO DE PADRÕES (O Requisito do PDF)</span></span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a>    <span class="co"># =====================================================================</span></span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Filtra colunas com nulos reais excluindo os IDs de controle para encontrar a variável de negócio mais crítica</span></span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a>    colunas_com_nulos <span class="op">=</span> df_nulos[(df_nulos[<span class="st">'Total_Nulos'</span>] <span class="op">&gt;</span> <span class="dv">0</span>) <span class="op">&amp;</span> (<span class="op">~</span>df_nulos.index.isin([<span class="st">'id_veiculo'</span>, col_pessoa, <span class="st">'id'</span>]))]</span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a>    coluna_critica <span class="op">=</span> colunas_com_nulos.index[<span class="dv">0</span>] <span class="cf">if</span> <span class="kw">not</span> colunas_com_nulos.empty <span class="cf">else</span> <span class="va">None</span></span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> coluna_critica:</span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">🔍 [Investigação] Analisando padrões de ausência para a coluna mais crítica: '</span><span class="sc">{</span>coluna_critica<span class="sc">}</span><span class="ss">'"</span>)</span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true" tabindex="-1"></a>        <span class="co"># A. Padrão Temporal: Distribuição por Ano</span></span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">📅 Distribuição de Ausências por Ano (%):"</span>)</span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a>        padrao_temporal <span class="op">=</span> con.execute(<span class="ss">f"""</span></span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a><span class="ss">            SELECT </span></span>
+<span id="cb4-122"><a href="#cb4-122" aria-hidden="true" tabindex="-1"></a><span class="ss">                CASE </span></span>
+<span id="cb4-123"><a href="#cb4-123" aria-hidden="true" tabindex="-1"></a><span class="ss">                    WHEN LENGTH(data_inversa) &gt;= 10 THEN SUBSTR(data_inversa, 1, 4)</span></span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a><span class="ss">                    ELSE data_inversa </span></span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a><span class="ss">                END as ano_analise,</span></span>
+<span id="cb4-126"><a href="#cb4-126" aria-hidden="true" tabindex="-1"></a><span class="ss">                ROUND(COUNT(CASE WHEN </span><span class="sc">{</span>coluna_critica<span class="sc">}</span><span class="ss"> IS NULL OR </span><span class="sc">{</span>coluna_critica<span class="sc">}</span><span class="ss"> = '' OR </span><span class="sc">{</span>coluna_critica<span class="sc">}</span><span class="ss"> = 'NA' THEN 1 END) * 100.0 / COUNT(*), 2) as percentual_nulo</span></span>
+<span id="cb4-127"><a href="#cb4-127" aria-hidden="true" tabindex="-1"></a><span class="ss">            FROM v_prf_bruto</span></span>
+<span id="cb4-128"><a href="#cb4-128" aria-hidden="true" tabindex="-1"></a><span class="ss">            GROUP BY ano_analise</span></span>
+<span id="cb4-129"><a href="#cb4-129" aria-hidden="true" tabindex="-1"></a><span class="ss">            ORDER BY ano_analise;</span></span>
+<span id="cb4-130"><a href="#cb4-130" aria-hidden="true" tabindex="-1"></a><span class="ss">        """</span>).df()</span>
+<span id="cb4-131"><a href="#cb4-131" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-132"><a href="#cb4-132" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Formata a coluna com o sinal de % antes de exibir</span></span>
+<span id="cb4-133"><a href="#cb4-133" aria-hidden="true" tabindex="-1"></a>        padrao_temporal[<span class="st">'percentual_nulo'</span>] <span class="op">=</span> padrao_temporal[<span class="st">'percentual_nulo'</span>].<span class="bu">map</span>(<span class="st">'</span><span class="sc">{:.2f}</span><span class="st">%'</span>.<span class="bu">format</span>)</span>
+<span id="cb4-134"><a href="#cb4-134" aria-hidden="true" tabindex="-1"></a>        display(padrao_temporal.set_index(<span class="st">'ano_analise'</span>))</span>
+<span id="cb4-135"><a href="#cb4-135" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-136"><a href="#cb4-136" aria-hidden="true" tabindex="-1"></a>        <span class="co"># B. Padrão Categórico: Distribuição por Estado (UF)</span></span>
+<span id="cb4-137"><a href="#cb4-137" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="st">'uf'</span> <span class="kw">in</span> colunas_disponiveis:</span>
+<span id="cb4-138"><a href="#cb4-138" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">📍 Distribuição de Ausências por UF (%):"</span>)</span>
+<span id="cb4-139"><a href="#cb4-139" aria-hidden="true" tabindex="-1"></a>            padrao_uf <span class="op">=</span> con.execute(<span class="ss">f"""</span></span>
+<span id="cb4-140"><a href="#cb4-140" aria-hidden="true" tabindex="-1"></a><span class="ss">                SELECT </span></span>
+<span id="cb4-141"><a href="#cb4-141" aria-hidden="true" tabindex="-1"></a><span class="ss">                    uf,</span></span>
+<span id="cb4-142"><a href="#cb4-142" aria-hidden="true" tabindex="-1"></a><span class="ss">                    ROUND(COUNT(CASE WHEN </span><span class="sc">{</span>coluna_critica<span class="sc">}</span><span class="ss"> IS NULL OR </span><span class="sc">{</span>coluna_critica<span class="sc">}</span><span class="ss"> = '' OR </span><span class="sc">{</span>coluna_critica<span class="sc">}</span><span class="ss"> = 'NA' THEN 1 END) * 100.0 / COUNT(*), 2) as percentual_nulo</span></span>
+<span id="cb4-143"><a href="#cb4-143" aria-hidden="true" tabindex="-1"></a><span class="ss">                FROM v_prf_bruto</span></span>
+<span id="cb4-144"><a href="#cb4-144" aria-hidden="true" tabindex="-1"></a><span class="ss">                GROUP BY uf</span></span>
+<span id="cb4-145"><a href="#cb4-145" aria-hidden="true" tabindex="-1"></a><span class="ss">                ORDER BY percentual_nulo DESC;</span></span>
+<span id="cb4-146"><a href="#cb4-146" aria-hidden="true" tabindex="-1"></a><span class="ss">            """</span>).df()</span>
+<span id="cb4-147"><a href="#cb4-147" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb4-148"><a href="#cb4-148" aria-hidden="true" tabindex="-1"></a>            <span class="co"># Formata a coluna com o sinal de % antes de exibir</span></span>
+<span id="cb4-149"><a href="#cb4-149" aria-hidden="true" tabindex="-1"></a>            padrao_uf[<span class="st">'percentual_nulo'</span>] <span class="op">=</span> padrao_uf[<span class="st">'percentual_nulo'</span>].<span class="bu">map</span>(<span class="st">'</span><span class="sc">{:.2f}</span><span class="st">%'</span>.<span class="bu">format</span>)</span>
+<span id="cb4-150"><a href="#cb4-150" aria-hidden="true" tabindex="-1"></a>            display(padrao_uf.set_index(<span class="st">'uf'</span>))</span>
+<span id="cb4-151"><a href="#cb4-151" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb4-152"><a href="#cb4-152" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb4-153"><a href="#cb4-153" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">✨ Excelente! Nenhuma coluna de negócio possui valores nulos nativos no dataset bruto."</span>)</span>
+<span id="cb4-154"><a href="#cb4-154" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-155"><a href="#cb4-155" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb4-156"><a href="#cb4-156" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"❌ Erro: Nenhum arquivo bruto foi localizado em </span><span class="sc">{</span>RAW_DIR<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>🎯 Iniciando Diagnóstico de Completude e Repetição de Identificadores...
+
+🔄 [Análise de Repetição] Avaliando a frequência de chaves no dataset geral:</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<script type="application/vnd.jupyter.widget-view+json">
+{"model_id":"a6cd5cc4cda24cc39c335b5327a2e02a","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
+</script>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   • ID do Acidente : Média 7.89 linhas/ocorrência (Máx: 2100).
+   • ID do Veículo  : Média 4.14 linhas/veículo (Máx: 94472).
+   • ID da Pessoa ('pesid'): Média 3.26 linhas/indivíduo (Máx: 263997).
+
+📊 [Completude] Calculando a taxa de preenchimento e ausência por coluna...
+   • Volume de amostragem: 2.702.004 linhas analisadas.</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<script type="application/vnd.jupyter.widget-view+json">
+{"model_id":"3d1058a62edd4615a1b1191d498cfb21","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
+</script>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+📋 Tabela Completa de Completude (Todas as Colunas do Dataset Bruto):</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Total_Nulos</th>
+<th data-quarto-table-cell-role="th">Percentual_Nulos (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">idade</th>
+<td>500.347</td>
+<td>18.52%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">feridos_graves</th>
+<td>263.997</td>
+<td>9.77%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">mortos</th>
+<td>263.997</td>
+<td>9.77%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">feridos_leves</th>
+<td>263.997</td>
+<td>9.77%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">pesid</th>
+<td>263.997</td>
+<td>9.77%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">sexo</th>
+<td>263.997</td>
+<td>9.77%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">estado_fisico</th>
+<td>263.997</td>
+<td>9.77%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">tipo_envolvido</th>
+<td>263.997</td>
+<td>9.77%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">ilesos</th>
+<td>263.997</td>
+<td>9.77%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">id_veiculo</th>
+<td>94.472</td>
+<td>3.50%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">tipo_veiculo</th>
+<td>94.472</td>
+<td>3.50%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">ano_fabricacao_veiculo</th>
+<td>94.472</td>
+<td>3.50%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">br</th>
+<td>7.680</td>
+<td>0.28%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">km</th>
+<td>7.680</td>
+<td>0.28%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">uop</th>
+<td>298</td>
+<td>0.01%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">regional</th>
+<td>298</td>
+<td>0.01%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">delegacia</th>
+<td>298</td>
+<td>0.01%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">classificacao_acidente</th>
+<td>86</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">dia_semana</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">data_inversa</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">id</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">horario</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">tracado_via</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">tipo_pista</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">condicao_metereologica</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">uso_solo</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">sentido_via</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">ordem_tipo_acidente</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">tipo_acidente</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">municipio</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">uf</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">causa_acidente</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">causa_principal</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">fase_dia</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">marca</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">latitude</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">longitude</th>
+<td>0</td>
+<td>0.00%</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+🔍 [Investigação] Analisando padrões de ausência para a coluna mais crítica: 'idade'
+
+📅 Distribuição de Ausências por Ano (%):</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<script type="application/vnd.jupyter.widget-view+json">
+{"model_id":"8231fae8b5634bd99fecd593f96af28f","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
+</script>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">percentual_nulo</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">ano_analise</th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2021</th>
+<td>18.70%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2022</th>
+<td>19.37%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2023</th>
+<td>18.47%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2024</th>
+<td>18.14%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2025</th>
+<td>18.08%</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+📍 Distribuição de Ausências por UF (%):</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<script type="application/vnd.jupyter.widget-view+json">
+{"model_id":"966d0073fdad4c70ac418caf61fa1737","version_major":2,"version_minor":0,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
+</script>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">percentual_nulo</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">uf</th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">MT</th>
+<td>31.26%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">PA</th>
+<td>29.94%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">AM</th>
+<td>26.35%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">TO</th>
+<td>25.16%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">MS</th>
+<td>22.84%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">MA</th>
+<td>22.46%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">BA</th>
+<td>21.75%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">RO</th>
+<td>21.22%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">GO</th>
+<td>20.89%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">PR</th>
+<td>19.58%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">AL</th>
+<td>19.47%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">MG</th>
+<td>18.74%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">SE</th>
+<td>18.13%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">CE</th>
+<td>17.60%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">PI</th>
+<td>17.12%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">RR</th>
+<td>16.76%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">PE</th>
+<td>16.54%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">ES</th>
+<td>15.95%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">SP</th>
+<td>15.66%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">PB</th>
+<td>15.15%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">AC</th>
+<td>14.68%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">RS</th>
+<td>14.32%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">SC</th>
+<td>13.71%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">AP</th>
+<td>13.46%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">RN</th>
+<td>12.28%</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">RJ</th>
+<td>11.43%</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">DF</th>
+<td>10.19%</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>📝 Conclusão da Equipe (Completude): A dimensão de Completude e Granularidade revelou que a base bruta possui 2.702.004 registros, operando em uma estrutura onde cada acidente envolve, em média, 7,89 linhas, o que confirma a orientação do dataset ao indivíduo. Contudo, os volumes máximos alarmantes de repetição para o ID da Pessoa (263.997) e do Veículo (94.472) indicam o uso massivo de máscaras textuais genéricas (como “0” ou “NÃO IDENTIFICADO”) para tratar registros sem identificação clara na ponta. No aspecto de dados ausentes, a variável idade consolidou-se como o campo de negócio mais crítico, apresentando uma taxa crônica de 18,52% de nulos que se mantém estável temporalmente (flutuando na faixa dos 18% entre 2021 e 2025), mas que exibe uma severa assimetria geográfica, concentrando as maiores falhas de preenchimento em estados como Mato Grosso (31,26%) e Pará (29,94%). Adicionalmente, detectou-se um comportamento de omissão em bloco (9,77% de nulos idênticos) para variáveis físicas e de gravidade (sexo, estado_fisico, mortos, feridos), evidenciando um padrão de ausência não-aleatório que desafia a integridade estatística e exige tratamento prioritário na etapa de transformação.</p>
+</section>
+<section id="dimensão-consistência" class="level1">
+<h1>2. Dimensão: Consistência</h1>
+<p><strong>Objetivo:</strong> Verificar contradições internas na base de dados.</p>
+<p>import duckdb import os import pandas as pd from pathlib import Path</p>
+<p>print(“🛡️ Iniciando Testes de Consistência Interna com DuckDB (Versão Corrigida)…”)</p>
+</section>
+<section id="configuração-de-caminhos-dinâmicos" class="level1">
+<h1>1. Configuração de caminhos dinâmicos</h1>
+<p>PROJECT_ROOT = Path(os.getcwd()).resolve().parent RAW_DIR = PROJECT_ROOT / “data” / “raw”</p>
+<p>arquivos_csv = list(RAW_DIR.glob(“prf_191_*.csv”))</p>
+<p>if arquivos_csv: PATH_CSV_BRUTO = arquivos_csv[-1] con = duckdb.connect(database=‘:memory:’)</p>
+<pre><code># Cria a view mestre no DuckDB
+con.execute(f"""
+    CREATE OR REPLACE VIEW v_prf_bruto AS 
+    SELECT * FROM read_csv_auto('{PATH_CSV_BRUTO}', delim=';', encoding='latin-1', all_varchar=True);
+""")
+
+# Detecta as colunas disponíveis na base
+colunas_disponiveis = [col[0] for col in con.execute("DESCRIBE v_prf_bruto;").fetchall()]
+
+# Mapeia dinamicamente os nomes exatos das colunas numéricas de gravidade
+col_mortos = 'mortos' if 'mortos' in colunas_disponiveis else None
+col_f_leves = 'feridos_leves' if 'feridos_leves' in colunas_disponiveis else None
+col_f_graves = 'feridos_graves' if 'feridos_graves' in colunas_disponiveis else None
+col_ilesos = 'ilesos' if 'ilesos' in colunas_disponiveis else None
+col_ignorados = 'ignorados' if 'ignorados' in colunas_disponiveis else None
+col_pessoas = 'pessoas' if 'pessoas' in colunas_disponiveis else None
+col_feridos = 'feridos' if 'feridos' in colunas_disponiveis else None
+
+# =====================================================================
+# PARTE 1: CONSTRUÇÃO DA VIEW DE SANITIZAÇÃO (Casting Defensivo)
+# =====================================================================
+def cast_inteiro(coluna):
+    if coluna and coluna in colunas_disponiveis:
+        return f"COALESCE(TRY_CAST({coluna} AS INTEGER), 0)"
+    return "0"
+
+con.execute(f"""
+    CREATE OR REPLACE VIEW v_consistencia_sanitizada AS
+    SELECT 
+        *,
+        LOWER(CAST(COALESCE(classificacao_acidente, '') AS VARCHAR)) as classe_clean,
+        TRY_CAST(latitude AS DOUBLE) as lat_num,
+        TRY_CAST(longitude AS DOUBLE) as lon_num,
+        {cast_inteiro(col_mortos)} as n_mortos,
+        {cast_inteiro(col_f_leves)} as n_f_leves,
+        {cast_inteiro(col_f_graves)} as n_f_graves,
+        {cast_inteiro(col_ilesos)} as n_ilesos,
+        {cast_inteiro(col_ignorados)} as n_ignorados,
+        {cast_inteiro(col_pessoas)} as n_pessoas,
+        {cast_inteiro(col_feridos)} as n_feridos
+    FROM v_prf_bruto;
+""")
+
+# =====================================================================
+# PARTE 2: EXECUÇÃO DAS REGRAS DE CONSISTÊNCIA
+# =====================================================================
+print("📊 [Resultados da Auditoria] Incoerências detectadas na base:")
+
+# Regra 1: Valores numéricos negativos
+r1 = con.execute("""
+    SELECT COUNT(*) FROM v_consistencia_sanitizada 
+    WHERE n_mortos &lt; 0 OR n_f_leves &lt; 0 OR n_f_graves &lt; 0 OR n_ilesos &lt; 0 
+       OR n_ignorados &lt; 0 OR n_pessoas &lt; 0;
+""").fetchone()[0]
+print(f"   ❌ Regra 1: Registros com valores numéricos negativos: {r1:,}".replace(',', '.'))
+
+# Regra 2: Vítimas sem associação a um ID de Veículo Válido
+r2 = con.execute("""
+    SELECT COUNT(*) FROM v_consistencia_sanitizada 
+    WHERE (id_veiculo IS NULL OR id_veiculo = '' OR id_veiculo = '0' OR id_veiculo = 'NA') 
+      AND (n_mortos &gt; 0 OR n_f_leves &gt; 0 OR n_f_graves &gt; 0);
+""").fetchone()[0]
+print(f"   ❌ Regra 2: Vítimas registradas sem associação a um veículo (id_veiculo ausente/zerado): {r2:,}".replace(',', '.'))
+
+# Regra 3: Consistência na Matemática de Feridos (Leves + Graves != Total)
+if col_feridos:
+    r3 = con.execute("""
+        SELECT COUNT(*) FROM v_consistencia_sanitizada 
+        WHERE (n_f_leves + n_f_graves) != n_feridos;
+    """).fetchone()[0]
+    print(f"   ❌ Regra 3: Incoerência na soma de feridos (Leves + Graves != Total): {r3:,}".replace(',', '.'))
+else:
+    print("   🔹 Regra 3: Ignorada (Coluna macro 'feridos' não existe neste layout).")
+
+# Regra 4: Consistência na Matemática Total de Pessoas (Soma dos componentes != Campo Pessoas)
+r4 = con.execute("""
+    SELECT COUNT(*) FROM v_consistencia_sanitizada 
+    WHERE (n_mortos + n_f_leves + n_f_graves + n_ilesos + n_ignorados) != n_pessoas;
+""").fetchone()[0]
+print(f"   ❌ Regra 4: Incoerência na soma total de pessoas (Categorias != Campo Pessoas): {r4:,}".replace(',', '.'))
+
+# Regra 5: Contradição Textual - Classificação diz "Com Vítimas Mortas" mas contador de mortos é zero
+r5 = con.execute("""
+    SELECT COUNT(*) FROM v_consistencia_sanitizada 
+    WHERE classe_clean LIKE '%morta%' AND n_mortos = 0;
+""").fetchone()[0]
+print(f"   ❌ Regra 5: Contradição em 'Com Vítimas Mortas' mas com zero mortos no contador: {r5:,}".replace(',', '.'))
+
+# Regra 6: Contradição Textual - Classificação diz "Sem Vítimas" mas registra feridos/mortos
+r6 = con.execute("""
+    SELECT COUNT(*) FROM v_consistencia_sanitizada 
+    WHERE (classe_clean LIKE '%sem vít%' OR classe_clean LIKE '%sem vit%') 
+      AND (n_mortos &gt; 0 OR n_f_leves &gt; 0 OR n_f_graves &gt; 0);
+""").fetchone()[0]
+print(f"   ❌ Regra 6: Contradição em 'Sem Vítimas' mas registrando feridos/mortos: {r6:,}".replace(',', '.'))
+
+# Regra 7: Consistência Geográfica (Coordenadas zeradas ou fora do padrão do território brasileiro)
+r7 = con.execute("""
+    SELECT COUNT(*) FROM v_consistencia_sanitizada 
+    WHERE lat_num = 0.0 OR lon_num = 0.0 
+       OR lat_num &gt; 6.0 OR lat_num &lt; -34.0 
+       OR lon_num &gt; -34.0 OR lon_num &lt; -74.0;
+""").fetchone()[0]
+print(f"   ❌ Regra 7: Registros com coordenadas de GPS inválidas ou fora do Brasil: {r7:,}".replace(',', '.'))</code></pre>
+<p>else: print(f”❌ Erro: Nenhum arquivo bruto foi localizado em {RAW_DIR}“) ```</p>
+<p>📝 Conclusão da Equipe (Consistência):Os resultados da auditoria de Consistência Interna revelaram distorções massivas e sistêmicas na base bruta que expõem a incompatibilidade de aplicar regras relacionais tradicionais diretamente em um dataset orientado ao indivíduo. A ausência de registros negativos (Regra 1) e de contradições textuais na classificação do acidente (Regras 5 e 6), aliada ao número irrisório de coordenadas de GPS inválidas ou fora do território nacional (Regra 7: apenas 34 casos), atesta que os dados individuais inseridos possuem boa integridade isolada. No entanto, o colapso lógico ocorre nas validações agregadas: a identificação de 1.273.410 acidentes com vítimas mas zero veículos (Regra 2) e 2.272.211 inconsistências na soma total de pessoas (Regra 4) não indica necessariamente erros de digitação dos agentes da PRF, mas sim um reflexo direto da granularidade da base. Como o arquivo bruto repete as linhas para cada pessoa envolvida e herda colunas de contadores macro (como o total de veículos e pessoas daquela ocorrência), a soma simples desses campos em todas as linhas gera um efeito multiplicador inflacionário artificial, exigindo que a etapa de transformação trate essas variáveis de forma contextualizada ou faça a normalização das tabelas para evitar análises duplicadas na Trusted.</p>
+</section>
+<section id="dimensão-acurácia" class="level1">
+<h1>3. Dimensão: Acurácia</h1>
+<p><strong>Objetivo:</strong> Verificar se os valores existentes fazem sentido, analisar a tipagem correta e detetar outliers.</p>
+<pre class="{python}"><code>import duckdb
+import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+
+print("🎯 Iniciando Testes de Acurácia dos Dados com DuckDB...\n")
+
+# 1. Configuração de caminhos dinâmicos
+PROJECT_ROOT = Path(os.getcwd()).resolve().parent
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+
+arquivos_csv = list(RAW_DIR.glob("prf_191_*.csv"))
+
+if arquivos_csv:
+    PATH_CSV_BRUTO = arquivos_csv[-1]
+    con = duckdb.connect(database=':memory:')
+    
+    # Cria a view mestre
+    con.execute(f"""
+        CREATE OR REPLACE VIEW v_prf_bruto AS 
+        SELECT * FROM read_csv_auto('{PATH_CSV_BRUTO}', delim=';', encoding='latin-1', all_varchar=True);
+    """)
+    
+    colunas_disponiveis = [col[0] for col in con.execute("DESCRIBE v_prf_bruto;").fetchall()]
+
+    # =====================================================================
+    # 3.1 VALIDAÇÃO DE DOMÍNIO (Unidades da Federação)
+    # =====================================================================
+    if 'uf' in colunas_disponiveis:
+        lista_ufs_validas = "('AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', " \
+                            "'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', " \
+                            "'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO')"
+        
+        # Filtra registros com UFs inválidas limpando espaços e forçando caixa alta
+        ufs_invalidas_df = con.execute(f"""
+            SELECT uf, COUNT(*) as qtd 
+            FROM v_prf_bruto 
+            WHERE UPPER(TRIM(uf)) NOT IN {lista_ufs_validas}
+            GROUP BY uf;
+        """).df()
+        
+        total_invalidas = ufs_invalidas_df['qtd'].sum()
+        print(f"✅ Regra 1: Registros com UF fora do domínio nacional: {total_invalidas}")
+        if total_invalidas &gt; 0:
+            print(f"   ⚠️ UFs estranhas encontradas no dataset bruto: {ufs_invalidas_df['uf'].unique()}")
+
+    # =====================================================================
+    # 3.2 CONSISTÊNCIA QUALITATIVA DE CATEGORIAS (Cardinalidade)
+    # =====================================================================
+    # Mapeia as colunas do seu layout (ajustado de condicao_metereologica para condicao_meteorologica se necessário)
+    col_meteo = 'condicao_meteorologica' if 'condicao_meteorologica' in colunas_disponiveis else ('condicao_metereologica' if 'condicao_metereologica' in colunas_disponiveis else None)
+    
+    categorias_criticas = {
+        'causa_acidente': 'causa_acidente',
+        'condicao_meteorologica': col_meteo,
+        'fase_dia': 'fase_dia' if 'fase_dia' in colunas_disponiveis else None,
+        'classificacao_acidente': 'classificacao_acidente' if 'classificacao_acidente' in colunas_disponiveis else None
+    }
+    
+    print("\n🔍 Regra 2: Verificando cardinalidade e domínios textuais nas variáveis de negócio:")
+    for nome_exibicao, col_real in categorias_criticas.items():
+        if col_real:
+            qtd_categorias = con.execute(f"SELECT COUNT(DISTINCT {col_real}) FROM v_prf_bruto;").fetchone()[0]
+            print(f"   - A coluna '{nome_exibicao}' possui {qtd_categorias} categorias exclusivas (grafias únicas).")
+
+    # =====================================================================
+    # 3.3 ANÁLISE AVANÇADA DE OUTLIERS (Agrupada por Acidente via DuckDB)
+    # =====================================================================
+    print("\n📈 Regra 3: Análise Estatística de Limites e Proporções (Método IQR):\n")
+    
+    # Como as colunas de contagem de gravidade estão no nível da pessoa, nós agrupamos por ID do acidente 
+    # para descobrir o volume REAL de envolvidos por ocorrência sem inflação.
+    df_acidentes_agrupados = con.execute("""
+        SELECT 
+            id,
+            COUNT(DISTINCT pesid) as total_pessoas_real,
+            COUNT(DISTINCT id_veiculo) as total_veiculos_real,
+            SUM(COALESCE(TRY_CAST(mortos AS INTEGER), 0)) as total_mortos,
+            SUM(COALESCE(TRY_CAST(feridos_graves AS INTEGER), 0)) as total_graves,
+            SUM(COALESCE(TRY_CAST(feridos_leves AS INTEGER), 0)) as total_leves
+        FROM v_prf_bruto
+        GROUP BY id;
+    """).df()
+
+    # Cálculo dos limites lógicos (IQR Extremas: Q3 + 3*IQR) para Métricas Gerais
+    metricas_reais = ['total_pessoas_real', 'total_veiculos_real']
+    titulos_gerais = ['Pessoas Reais por Ocorrência', 'Veículos Reais por Ocorrência']
+    
+    # Criamos as razões de proporção apenas para acidentes que possuem alguma vítima (evitando divisão por zero)
+    df_vitimas = df_acidentes_agrupados[(df_acidentes_agrupados['total_mortos'] &gt; 0) | 
+                                        (df_acidentes_agrupados['total_graves'] &gt; 0) | 
+                                        (df_acidentes_agrupados['total_leves'] &gt; 0)].copy()
+
+    df_vitimas['razao_mortos_leves'] = np.where(df_vitimas['total_leves'] &gt; 0, df_vitimas['total_mortos'] / df_vitimas['total_leves'], np.nan)
+    df_vitimas['razao_mortos_graves'] = np.where(df_vitimas['total_graves'] &gt; 0, df_vitimas['total_mortos'] / df_vitimas['total_graves'], np.nan)
+    df_vitimas['razao_graves_leves'] = np.where(df_vitimas['total_leves'] &gt; 0, df_vitimas['total_graves'] / df_vitimas['total_leves'], np.nan)
+
+    colunas_proporcao = ['razao_mortos_leves', 'razao_mortos_graves', 'razao_graves_leves']
+    titulos_proporcao = ['Razão Mortos / F. Leves', 'Razão Mortos / F. Graves', 'Razão F. Graves / F. Leves']
+
+    # --- PLOT UNIFICADO (5 Boxplots) ---
+    fig, axes = plt.subplots(1, 5, figsize=(24, 5))
+
+    # 1. Plot e cálculo de Outliers para as Métricas Gerais Recalculadas
+    for i, col in enumerate(metricas_reais):
+        Q1 = df_acidentes_agrupados[col].quantile(0.25)
+        Q3 = df_acidentes_agrupados[col].quantile(0.75)
+        IQR = Q3 - Q1
+        limite_superior = Q3 + 3.0 * IQR
+        outliers_extremos = df_acidentes_agrupados[df_acidentes_agrupados[col] &gt; limite_superior]
+        
+        print(f"   - Volumetria '{titulos_gerais[i]}': Limite estável até {int(limite_superior)}. Outliers Extremos: {len(outliers_extremos)} acidentes.")
+        
+        sns.boxplot(y=df_acidentes_agrupados[col], ax=axes[i], color='#4C72B0')
+        axes[i].set_title(f'{titulos_gerais[i]}')
+        axes[i].set_ylabel('')
+
+    # 2. Plot e cálculo de Outliers para as Razões de Gravidade
+    for j, col in enumerate(colunas_proporcao):
+        idx_ax = len(metricas_reais) + j
+        dados_validos = df_vitimas[col].dropna()
+        
+        if not dados_validos.empty:
+            Q1 = dados_validos.quantile(0.25)
+            Q3 = dados_validos.quantile(0.75)
+            IQR = Q3 - Q1
+            limite_sup_prop = Q3 + 3.0 * IQR
+            outliers_proporcao = df_vitimas[df_vitimas[col] &gt; limite_sup_prop]
+            
+            print(f"   - Proporção '{titulos_proporcao[j]}': Limite estável até {limite_sup_prop:.2f}. Outliers Extremos: {len(outliers_proporcao)} acidentes.")
+            
+            sns.boxplot(y=df_vitimas[col], ax=axes[idx_ax], color='#E15759')
+            axes[idx_ax].set_title(f'{titulos_proporcao[j]}')
+            axes[idx_ax].set_ylabel('')
+        else:
+            axes[idx_ax].text(0.5, 0.5, 'Sem dados válidos', ha='center', va='center')
+
+    plt.tight_layout()
+    plt.show()
+
+else:
+    print(f"❌ Erro: Nenhum arquivo bruto foi localizado em {RAW_DIR}")</code></pre>
+<p>📝 Conclusão da Equipe (Acurácia): A dimensão de Acurácia, auditada com precisão analítica via DuckDB ao nível agregado do acidente, atestou a integridade categórica do dataset com zero registros de UFs inválidas (Regra 1) e uma cardinalidade textual controlada para variáveis críticas de negócio (Regra 2), mapeando 77 causas exclusivas, 10 condições meteorológicas e 4 classificações de severidade. Contudo, a modelagem estatística por limites pelo método IQR de Extremos (Regra 3) revelou assimetrias severas e comportamentos de cauda longa típicos de grandes desastres logísticos rodoviários: o limite estável estabeleceu o teto estatístico de até 6 pessoas e 5 veículos reais por ocorrência, classificando 7.949 e 4.279 acidentes como outliers volumétricos, respectivamente. O fenômeno mais crítico manifestou-se nos gráficos de caixas das razões de proporção de severidade (Mortos e Feridos), cujos limites estáveis convergiram a zero devido ao predomínio massivo de acidentes leves na base, fazendo com que qualquer ocorrência com alta taxa de letalidade imediata gerasse milhares de anomalias estatísticas isoladas (como os 21.030 acidentes identificados na razão de Feridos Graves por Leves), métricas fundamentais que dão embasamento teórico para delimitar o escopo de modelagem preditiva ou normalização na camada trusted. # 4. Dimensão: Temporalidade <strong>Objetivo:</strong> Avaliar a correção das datas e a existência de lacunas no tempo ou datas futuras.</p>
+<pre class="{python}"><code>import duckdb
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+print("📅 Iniciando Testes de Temporalidade com DuckDB...\n")
+
+# 1. Configuração de caminhos dinâmicos
+PROJECT_ROOT = Path(os.getcwd()).resolve().parent
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+
+arquivos_csv = list(RAW_DIR.glob("prf_191_*.csv"))
+
+if arquivos_csv:
+    PATH_CSV_BRUTO = arquivos_csv[-1]
+    con = duckdb.connect(database=':memory:')
+    
+    # Cria a view mestre
+    con.execute(f"""
+        CREATE OR REPLACE VIEW v_prf_bruto AS 
+        SELECT * FROM read_csv_auto('{PATH_CSV_BRUTO}', delim=';', encoding='latin-1', all_varchar=True);
+    """)
+    
+    colunas_disponiveis = [col[0] for col in con.execute("DESCRIBE v_prf_bruto;").fetchall()]
+
+    if 'data_inversa' in colunas_disponiveis:
+        
+        # =====================================================================
+        # PARTE 1: VIEW COM PARSING DE DATA DEFENSIVO
+        # =====================================================================
+        # O TRY_CAST tenta converter formatos ISO (YYYY-MM-DD) ou BR (DD/MM/YYYY) automaticamente
+        con.execute("""
+            CREATE OR REPLACE VIEW v_temporalidade_validada AS
+            SELECT 
+                *,
+                COALESCE(TRY_CAST(data_inversa AS DATE), strptime(data_inversa, '%d/%m/%Y')::DATE) as data_validada
+            FROM v_prf_bruto;
+        """)
+
+        # Regra 1: Registros com datas corrompidas ou inválidas
+        r1 = con.execute("SELECT COUNT(*) FROM v_temporalidade_validada WHERE data_validada IS NULL;").fetchone()[0]
+        print(f"   ❌ Regra 1: Registros com datas corrompidas ou inválidas: {r1}")
+
+        # Verifica se há dados válidos para continuar as análises temporais
+        total_linhas = con.execute("SELECT COUNT(*) FROM v_temporalidade_validada;").fetchone()[0]
+        
+        if r1 &lt; total_linhas:
+            # Regra 2: Cobertura da Série Histórica
+            datas_limite = con.execute("SELECT MIN(data_validada), MAX(data_validada) FROM v_temporalidade_validada;").fetchone()
+            data_min, data_max = datas_limite[0], datas_limite[1]
+            
+            print(f"   ⏱️  Regra 2: Cobertura da Série Histórica:")
+            print(f"      - Ponto inicial dos dados: {data_min.strftime('%d/%m/%Y')}")
+            print(f"      - Ponto final dos dados:   {data_max.strftime('%d/%m/%Y')}")
+            
+            # Regra 3: Check de Viagem no Tempo (Datas além do dia de hoje)
+            # Nota: O DuckDB executa a comparação contra a data atual do sistema (CURRENT_DATE)
+            r3_df = con.execute("""
+                SELECT data_inversa, COUNT(*) as qtd 
+                FROM v_temporalidade_validada 
+                WHERE data_validada &gt; CURRENT_DATE
+                GROUP BY data_inversa;
+            """).df()
+            
+            print(f"   ❌ Regra 3: Registros com datas futuras aberrantes: {r3_df['qtd'].sum()}")
+            if len(r3_df) &gt; 0:
+                print(f"      ⚠️ Amostra de datas futuras detectadas: {r3_df['data_inversa'].unique()[:5]}")
+
+            # Regra 4: Investigação de Lacunas (Gaps Críticos por Dias Zerados)
+            # Geramos uma série temporal contínua no SQL e cruzamos com os dias reais do dataset
+            r4 = con.execute(f"""
+                WITH calendario AS (
+                    SELECT CAST(generate_series AS DATE) as dia_calendario
+                    FROM generate_series(CAST('{data_min}' AS DATE), CAST('{data_max}' AS DATE), INTERVAL '1 DAY')
+                ),
+                dados_diarios AS (
+                    SELECT data_validada, COUNT(*) as qtd 
+                    FROM v_temporalidade_validada 
+                    WHERE data_validada IS NOT NULL
+                    GROUP BY data_validada
+                )
+                SELECT COUNT(*) 
+                FROM calendario c
+                LEFT JOIN dados_diarios d ON c.dia_calendario = d.data_validada
+                WHERE d.data_validada IS NULL;
+            """).fetchone()[0]
+            
+            print(f"   ❌ Regra 4: Dias completos sem nenhum registro na série (Lacunas): {r4}")
+
+            # =====================================================================
+            # PARTE 2: AGREGAÇÃO MENSAL E PLOT DA TENDÊNCIA
+            # =====================================================================
+            # Agrupamos por Ano-Mês direto no DuckDB para alimentar o gráfico de forma leve
+            df_tendencia = con.execute("""
+                SELECT 
+                    strftime(data_validada, '%Y-%m') as ano_mes,
+                    COUNT(*) as qtd_ocorrencias
+                FROM v_temporalidade_validada
+                WHERE data_validada IS NOT NULL
+                GROUP BY ano_mes
+                ORDER BY ano_mes;
+            """).df()
+
+            # Renderização do Gráfico de Linha Confiável
+            plt.figure(figsize=(12, 4.5))
+            plt.plot(df_tendencia['ano_mes'], df_tendencia['qtd_ocorrencias'], 
+                     marker='o', color='#2b5c8f', linewidth=2, markersize=4)
+            
+            plt.title('Evolução Mensal do Volume de Acidentes (Série Histórica)', fontsize=12, fontweight='bold')
+            plt.xlabel('Linha do Tempo (Ano-Mês)')
+            plt.ylabel('Quantidade de Ocorrências')
+            
+            # Ajusta os labels do eixo X para não sobrecarregar visualmente
+            ticks_intervalo = max(1, len(df_tendencia) // 12)
+            plt.xticks(df_tendencia['ano_mes'][::ticks_intervalo], rotation=45, ha='right')
+            
+            plt.grid(True, linestyle='--', alpha=0.6)
+            plt.tight_layout()
+            plt.show()
+
+    else:
+        print("⚠️ Erro: A coluna 'data_inversa' não foi localizada no layout da base.")
+else:
+    print(f"❌ Erro: Nenhum arquivo bruto foi localizado em {RAW_DIR}")</code></pre>
+<p>📝 Conclusão da Equipe (Temporalidade): A dimensão de Temporalidade, validada com o DuckDB, atestou a integridade cronológica absoluta da base de dados bruta ao registrar zero ocorrências de datas corrompidas (Regra 1), zero registros com viagens no tempo em relação ao calendário atual (Regra 3) e zero lacunas diárias (Regra 4) ao longo de toda a série histórica, garantindo uma cobertura ininterrupta de 365 dias por ano. O mapeamento da série (Regra 2) delimitou um intervalo perfeito de cinco anos fechados, iniciando em 01/01/2021 e finalizando em 31/12/2025. Ao analisar o gráfico de evolução mensal gerado a partir do processamento vetorizado, observa-se uma tendência de crescimento estrutural no volume de registros entre 2021 e final de 2024, acompanhada por um padrão de sazonalidade recorrente caracterizado por picos agudos de ocorrências nos meses de dezembro (férias e festividades de fim de ano) seguidos de quedas abruptas nos primeiros meses de cada ano subsequente. Esse comportamento macro perfeitamente delimitado e livre de ruídos de preenchimento valida a qualidade cronológica do ecossistema RAW, indicando que a série temporal está madura e pronta para subsidiar análises preditivas ou modelos de decomposição de tendências na camada trusted.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script type="application/vnd.jupyter.widget-state+json">
+{"state":{"0e16f94165ab4180bb48526c940fda4b":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"14b780d7b5fb4a098f290bb147bc1446":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"1cc950e652a14a80913901420a6b8955":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}},"2df8e982f6a54bb7ab1a303943391c83":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"3d1058a62edd4615a1b1191d498cfb21":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_7e64f0d10bb54465b5fed4d0525de8da","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_7b9fd6c008c945da8d4b0123d3283412","tabbable":null,"tooltip":null,"value":100}},"7b9fd6c008c945da8d4b0123d3283412":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"ProgressStyleModel","state":{"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"ProgressStyleModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"StyleView","bar_color":"black","description_width":""}},"7e64f0d10bb54465b5fed4d0525de8da":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}},"8231fae8b5634bd99fecd593f96af28f":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_1cc950e652a14a80913901420a6b8955","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_14b780d7b5fb4a098f290bb147bc1446","tabbable":null,"tooltip":null,"value":100}},"966d0073fdad4c70ac418caf61fa1737":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_b42e7c0f556742dfa4f096c889594cb3","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_0e16f94165ab4180bb48526c940fda4b","tabbable":null,"tooltip":null,"value":100}},"a6cd5cc4cda24cc39c335b5327a2e02a":{"model_module":"@jupyter-widgets/controls","model_module_version":"2.0.0","model_name":"FloatProgressModel","state":{"_dom_classes":[],"_model_module":"@jupyter-widgets/controls","_model_module_version":"2.0.0","_model_name":"FloatProgressModel","_view_count":null,"_view_module":"@jupyter-widgets/controls","_view_module_version":"2.0.0","_view_name":"ProgressView","bar_style":"","description":"","description_allow_html":false,"layout":"IPY_MODEL_d035d4d439c44337b19eb45248abf9bd","max":100,"min":0,"orientation":"horizontal","style":"IPY_MODEL_2df8e982f6a54bb7ab1a303943391c83","tabbable":null,"tooltip":null,"value":100}},"b42e7c0f556742dfa4f096c889594cb3":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}},"d035d4d439c44337b19eb45248abf9bd":{"model_module":"@jupyter-widgets/base","model_module_version":"2.0.0","model_name":"LayoutModel","state":{"_model_module":"@jupyter-widgets/base","_model_module_version":"2.0.0","_model_name":"LayoutModel","_view_count":null,"_view_module":"@jupyter-widgets/base","_view_module_version":"2.0.0","_view_name":"LayoutView","align_content":null,"align_items":null,"align_self":null,"border_bottom":null,"border_left":null,"border_right":null,"border_top":null,"bottom":null,"display":null,"flex":null,"flex_flow":null,"grid_area":null,"grid_auto_columns":null,"grid_auto_flow":null,"grid_auto_rows":null,"grid_column":null,"grid_gap":null,"grid_row":null,"grid_template_areas":null,"grid_template_columns":null,"grid_template_rows":null,"height":null,"justify_content":null,"justify_items":null,"left":null,"margin":null,"max_height":null,"max_width":null,"min_height":null,"min_width":null,"object_fit":null,"object_position":null,"order":null,"overflow":null,"padding":null,"right":null,"top":null,"visibility":null,"width":"auto"}}},"version_major":2,"version_minor":0}
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

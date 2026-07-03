@@ -141,7 +141,7 @@ df_p3 = con.execute("""
         c.mes_ano,
         COUNT(DISTINCT f.id_acidente_original) AS total_acidentes
     FROM fato_acidentes_veiculos f
-    JOIN dim_calendario c ON f.id_data_fato = c.id_data
+    JOIN dim_calendario c ON f.id_data = c.id_data
     GROUP BY c.ano, c.mes, c.mes_ano
     ORDER BY c.ano ASC, c.mes ASC;
 """).df()

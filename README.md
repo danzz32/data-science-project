@@ -219,6 +219,8 @@ No VS Code: abra o arquivo `.ipynb`, clique em **Select Kernel** e escolha `data
 Os relatórios `.qmd` ficam em [`reports/`](./reports) e podem ser renderizados via VS Code ou terminal:
 
 ```bash
+quarto render docs/eda_qualidade.qmd --output-dir ../reports
+
 quarto render reports/relatorio.qmd
 ```
 
