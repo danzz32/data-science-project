@@ -76,6 +76,4 @@ logs/
 .tmp/
 docs/tmp/
 
-# Relatórios renderizados (opcional - comentar se quiser rastreá-los)
-reports/*.html
-reports/*.pdf
+
