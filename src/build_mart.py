@@ -80,7 +80,7 @@ def main():
         SELECT 
             id_acidente_original,
             id_veiculo_original,
-            CAST('2021-01-01' AS DATE) + CAST((r_num % 1825) AS INTEGER) AS id_data_fato, 
+            CAST('2021-01-01' AS DATE) + CAST((r_num % 1825) AS INTEGER) AS id_data, 
             MD5(COALESCE(uf, 'NI')) AS id_localidade,
             MD5(COALESCE(tipo_envolvido, 'NI')) AS id_envolvido,
             1 AS qtd_registros_envolvidos,

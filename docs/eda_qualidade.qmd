@@ -21,6 +21,7 @@ Este notebook tem como objetivo documentar o perfil de qualidade dos dados bruto
 
 ## Setup e Carregamento
 
+
 ```{python}
 import duckdb
 import os
