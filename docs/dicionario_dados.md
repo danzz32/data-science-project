@@ -23,7 +23,7 @@ Este documento descreve a estrutura do modelo dimensional (Star Schema) gerado p
   * **Aditividade:** Totalmente Aditiva (pode ser somada livremente por tempo ou região).
 * **`total_veiculos_no_acidente` (KPI 1)**
   * **Aditividade:** Não-Aditiva. Como o valor se repete para múltiplos envolvidos no mesmo acidente, a sua soma direta gerará duplicidade. Deve ser analisada por médias ou valores máximos por grupo de acidente.
-  * **Fórmula SQL:** `COUNT(DISTINCT id_veiculo) OVER(PARTITION BY id)`
+  * **Fórmula SQL:** `COUNT(DISTINCT id_veiculo) OVER(PARTITION BY id_acidente_original)`
 
 ---
 
