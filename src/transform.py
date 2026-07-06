@@ -11,7 +11,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # =====================================================================
-# CONTRATO DE DADOS (PANDERA) - Camada Trusted Granular
+# CONTRATO DE DADOS (PANDERA) - Camada Trusted Granular Corrigida
 # =====================================================================
 trusted_contract = pa.DataFrameSchema({
     # Chaves e Identificadores Originais da Base Granular (Por Indivíduo)
@@ -27,13 +27,15 @@ trusted_contract = pa.DataFrameSchema({
         'ro', 'rr', 'rs', 'sc', 'se', 'sp', 'to'
     ]), nullable=False),
     "br": Column(str, nullable=False), 
-    "latitude": Column(str, nullable=False),
-    "longitude": Column(str, nullable=False),
+    
+    # 🔥 CORREÇÃO: Contrato atualizado para exigir float/double numérico
+    "latitude": Column(float, coerce=True, nullable=True),
+    "longitude": Column(float, coerce=True, nullable=True),
 
     # Características da Ocorrência e Perfil do Indivíduo
     "causa_acidente": Column(str, nullable=False),
     "classificacao_acidente": Column(str, nullable=False),
-    "condicao_meteorologica": Column(str, nullable=False), # Nome padronizado no contrato
+    "condicao_meteorologica": Column(str, nullable=False), 
     "fase_dia": Column(str, nullable=False),
     "sexo": Column(str, nullable=False),
     "estado_fisico": Column(str, nullable=False),
@@ -60,16 +62,13 @@ def process_with_duckdb(raw_file_path: Path) -> tuple[pd.DataFrame, pd.DataFrame
     logging.info("Iniciando motor em memória do DuckDB para processamento vetorizado...")
     con = duckdb.connect(database=':memory:')
     
-    # Criação da view mestre forçando leitura inicial como texto para blindar contra quebras de nulos
     con.execute(f"""
         CREATE OR REPLACE VIEW v_raw_mestre AS 
         SELECT * FROM read_csv_auto('{raw_file_path}', delim=';', encoding='latin-1', all_varchar=True);
     """)
     
-    # Detecção e mapeamento dinâmico de colunas para garantir retrocompatibilidade de colunas numéricas
     cols_base = [col[0] for col in con.execute("DESCRIBE v_raw_mestre;").fetchall()]
     
-    # Mapeamento defensivo para contornar o erro de grafia "metereologica" vs "meteorologica"
     col_meteo = 'condicao_meteorologica'
     if 'condicao_metereologica' in cols_base:
         col_meteo = 'condicao_metereologica'
@@ -81,7 +80,7 @@ def process_with_duckdb(raw_file_path: Path) -> tuple[pd.DataFrame, pd.DataFrame
             return f"COALESCE(TRY_CAST(NULLIF(NULLIF(TRIM(v_raw_mestre.{col}), 'NA'), '') AS INTEGER), 0)"
         return "0"
 
-    # Query de Higienização corrigida com mapeamento dinâmico da coluna meteorológica
+    # Query de Higienização corrigida com mapeamento geográfico robusto
     query_transform = f"""
         SELECT 
             -- Chaves e Identificadores
@@ -95,10 +94,12 @@ def process_with_duckdb(raw_file_path: Path) -> tuple[pd.DataFrame, pd.DataFrame
             -- Georreferenciamento e Unidades da Federação
             LOWER(TRIM(v_raw_mestre.uf)) as uf,
             COALESCE(TRY_CAST(TRY_CAST(v_raw_mestre.br AS DOUBLE) AS INTEGER)::VARCHAR, '0') as br,
-            COALESCE(NULLIF(NULLIF(TRIM(v_raw_mestre.latitude), 'NA'), ''), '0.0') as latitude,
-            COALESCE(NULLIF(NULLIF(TRIM(v_raw_mestre.longitude), 'NA'), ''), '0.0') as longitude,
             
-            -- Normalização de Variáveis Categóricas e Textuais (Lower + Trim + Substituição de Vazios)
+            -- 🔥 CORREÇÃO: Tratando a vírgula decimal e tipando nativamente como DOUBLE/FLOAT
+            TRY_CAST(REPLACE(NULLIF(NULLIF(TRIM(v_raw_mestre.latitude), 'NA'), ''), ',', '.') AS DOUBLE) as latitude,
+            TRY_CAST(REPLACE(NULLIF(NULLIF(TRIM(v_raw_mestre.longitude), 'NA'), ''), ',', '.') AS DOUBLE) as longitude,
+            
+            -- Normalização de Variáveis Categóricas e Textuais
             LOWER(TRIM(COALESCE(NULLIF(NULLIF(v_raw_mestre.causa_acidente, 'NA'), ''), 'nao_informado'))) as causa_acidente,
             LOWER(TRIM(COALESCE(NULLIF(NULLIF(v_raw_mestre.classificacao_acidente, 'NA'), ''), 'nao_informado'))) as classificacao_acidente,
             LOWER(TRIM(COALESCE(NULLIF(NULLIF(v_raw_mestre.{col_meteo}, 'NA'), ''), 'nao_informado'))) as condicao_meteorologica,
@@ -117,10 +118,9 @@ def process_with_duckdb(raw_file_path: Path) -> tuple[pd.DataFrame, pd.DataFrame
         FROM v_raw_mestre;
     """
     
-    # Processa os dados pesados e exporta em DataFrame pronto para validação
     df_transformed = con.execute(query_transform).df()
     
-    # Separação estratégica para isolamento de dados corrompidos (Quarentena Seletiva)
+    # Separação seletiva para a quarentena
     df_aprovados = df_transformed[df_transformed['data_inversa'].notna() & df_transformed['id'].notna()].copy()
     df_quarentena = df_transformed[df_transformed['data_inversa'].isna() | df_transformed['id'].isna()].copy()
     
@@ -137,16 +137,15 @@ def process_with_duckdb(raw_file_path: Path) -> tuple[pd.DataFrame, pd.DataFrame
     return df_aprovados, df_quarentena, stats
 
 def gerar_relatorio(stats: dict, report_dir: Path, volumetria: dict):
-    """Gera o artefato descritivo Markdown documentando a qualidade e governança da execução."""
     report_path = report_dir / "quality_report.md"
     conteudo = f"""# Relatório de Qualidade de Dados - Camada Trusted (DuckDB Motor)
 **Data de Execução:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 **Estratégia Computacional:** Arquitetura Vetorizada de Alta Performance com DuckDB
 
 ## Resumo da Execução (Linhas)
-* **Total de Registros Lidos (Layer Raw):** {stats['total_lidos']:,}
-* **Total Aprovados pelo Pipeline:** {stats['total_aprovados']:,}
-* **Total Isolados na Quarentena:** {stats['total_quarentena']:,}
+* **Total de Registros Lidos (Layer Raw):** {stats['total_lidos']:}
+* **Total Aprovados pelo Pipeline:** {stats['total_aprovados']:}
+* **Total Isolados na Quarentena:** {stats['total_quarentena']:}
 
 ## Eficiência de Armazenamento e Compressão 📉
 * **Tamanho do Arquivo Bruto (CSV):** {volumetria['csv_size_mb']:.2f} MB
@@ -161,7 +160,6 @@ def gerar_relatorio(stats: dict, report_dir: Path, volumetria: dict):
     logging.info(f"📄 Relatório de Governança atualizado com sucesso em: {report_path}")
 
 def main():
-    # Inicialização dinâmica de caminhos de diretórios (Independente do ambiente de chamada)
     SCRIPT_DIR = Path(__file__).resolve().parent if '__file__' in locals() else Path(os.getcwd())
     ROOT_DIR = SCRIPT_DIR.parent if SCRIPT_DIR.name in ['src', 'notebooks'] else SCRIPT_DIR
     
@@ -170,7 +168,6 @@ def main():
     QUARANTINE_DIR = ROOT_DIR / "data" / "quarantine"
     REPORTS_DIR = ROOT_DIR / "reports"
 
-    # Garante a existência de toda a árvore de diretórios do projeto
     for folder in [TRUSTED_DIR, QUARANTINE_DIR, REPORTS_DIR]:
         folder.mkdir(parents=True, exist_ok=True)
 
@@ -181,10 +178,8 @@ def main():
         csv_size_bytes = raw_file.stat().st_size
         csv_size_mb = csv_size_bytes / (1024 * 1024)
 
-        # 🚀 Execução instantânea da higienização via DuckDB
         df_aprovados, df_quarentena, estatisticas = process_with_duckdb(raw_file)
 
-        # Escrita persistente dos registros isolados em Quarentena se houverem
         quarantine_path = QUARANTINE_DIR / "prf_acidentes_quarentena.parquet"
         if not df_quarentena.empty:
             df_quarentena.to_parquet(quarantine_path, index=False)
@@ -192,17 +187,14 @@ def main():
         elif quarantine_path.exists():
             quarantine_path.unlink()
 
-        # 🛡️ Validação contra o Contrato de Dados do Pandera
         logging.info("Submetendo DataFrame higienizado ao crivo do Pandera Contract...")
         df_validated = trusted_contract.validate(df_aprovados)
         logging.info("✅ Sucesso! Dados aderentes ao Contrato de Dados da Camada Trusted.")
 
-        # Persistência final na Trusted usando o formato colunar Parquet comprimido com Snappy
         output_path = TRUSTED_DIR / "prf_acidentes_trusted.parquet"
         df_validated.to_parquet(output_path, index=False, compression="snappy")
         logging.info(f"💾 Camada Trusted salva com sucesso em: {output_path}")
 
-        # Mensuração de eficiência volumétrica de compressão
         parquet_size_bytes = output_path.stat().st_size
         parquet_size_mb = parquet_size_bytes / (1024 * 1024)
         reducao_pct = ((csv_size_bytes - parquet_size_bytes) / csv_size_bytes) * 100
@@ -218,7 +210,6 @@ def main():
             "reducao_pct": reducao_pct
         }
 
-        # Atualiza a documentação de auditoria
         gerar_relatorio(estatisticas, REPORTS_DIR, volumetria)
         logging.info("🏁 Pipeline de Transformação concluído com sucesso total!")
 
