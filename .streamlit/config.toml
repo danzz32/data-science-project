@@ -1,0 +1,15 @@
+[theme]
+# Cor de destaque principal (Amarelo PRF Suave) para botões, checkboxes e focos
+primaryColor = "#F4D068"
+
+# Cor de fundo da área principal de conteúdo (Branco/Cinza bem claro)
+backgroundColor = "#F8F9FA"
+
+# Cor de fundo da barra lateral (Azul Marinho PRF em baixa tonalidade/pastel)
+secondaryBackgroundColor = "#729bdd"
+
+# Cor principal dos textos da interface
+textColor = "#000000"
+
+# Fonte padrão limpa
+font = "sans serif"
