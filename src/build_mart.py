@@ -67,26 +67,31 @@ def main():
     print("📊 Modelando Tabela Fato e computando métricas numéricas...")
     # Estratégia Blindada: Usamos ROW_NUMBER() para criar um índice sequencial único para gerar as datas sem depender de nenhuma coluna de data original
     con.execute("""
-        CREATE TABLE fato_acidentes_veiculos AS
-        WITH sequenciando AS (
-            SELECT 
-                id AS id_acidente_original,
-                id_veiculo AS id_veiculo_original,
-                uf,
-                tipo_envolvido,
-                ROW_NUMBER() OVER() AS r_num
-            FROM v_trusted
-        )
+    CREATE TABLE fato_acidentes_veiculos AS
+    WITH sequenciando AS (
         SELECT 
-            id_acidente_original,
-            id_veiculo_original,
-            CAST('2021-01-01' AS DATE) + CAST((r_num % 1825) AS INTEGER) AS id_data, 
-            MD5(COALESCE(uf, 'NI')) AS id_localidade,
-            MD5(COALESCE(tipo_envolvido, 'NI')) AS id_envolvido,
-            1 AS qtd_registros_envolvidos,
-            COUNT(DISTINCT id_veiculo_original) OVER(PARTITION BY id_acidente_original) AS total_veiculos_no_acidente
-        FROM sequenciando;
-    """)
+            id AS id_acidente_original,
+            id_veiculo AS id_veiculo_original,
+            uf,
+            br,  
+            tipo_envolvido,
+            estado_fisico,
+            ROW_NUMBER() OVER() AS r_num
+        FROM v_trusted
+    )
+    SELECT 
+        id_acidente_original,
+        id_veiculo_original,
+        br AS rodovia_original, 
+        CAST('2021-01-01' AS DATE) + CAST((r_num % 1825) AS INTEGER) AS id_data,
+        MD5(COALESCE(uf, 'NI')) AS id_localidade,
+        MD5(COALESCE(tipo_envolvido, 'NI')) AS id_envolvido,
+        1 AS qtd_registros_envolvidos,
+        -- FLAG DE ÓBITO: Corrigido para comentário SQL aceito pelo DuckDB
+        CASE WHEN LOWER(estado_fisico) IN ('morto', 'óbito', 'obito') THEN 1 ELSE 0 END AS is_fatal,
+        COUNT(DISTINCT id_veiculo_original) OVER(PARTITION BY id_acidente_original) AS total_veiculos_no_acidente
+    FROM sequenciando;
+""")
 
     # 4. IMPLEMENTAÇÃO DE VIEW KPI 
     con.execute("""
