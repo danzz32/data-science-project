@@ -20,7 +20,9 @@ def main():
     con = duckdb.connect(database=":memory:")
     con.execute(f"CREATE VIEW v_trusted AS SELECT * FROM read_parquet('{trusted_file_path}')")
 
+    # =====================================================================
     # 1. CRIAÇÃO DA DIMENSÃO CALENDÁRIO (dim_calendario) 
+    # =====================================================================
     print("📅 Gerando Dimensão Calendário programática (2021-2025)...")
     con.execute("""
         CREATE TABLE dim_calendario AS
@@ -44,14 +46,19 @@ def main():
         FROM generate_series(TIMESTAMP '2021-01-01', TIMESTAMP '2025-12-31', INTERVAL '1 day') AS t(data_seq);
     """)
 
+    # =====================================================================
     # 2. CRIAÇÃO DAS DIMENSÕES 
+    # =====================================================================
     print("📐 Isolando atributos e construindo tabelas de Dimensão...")
     
+    # AJUSTE CRÍTICO: Incluindo latitude e longitude na dimensão conforme o app.py exige!
     con.execute("""
         CREATE TABLE dim_localidade AS
         SELECT DISTINCT
-            MD5(COALESCE(uf, 'NI')) AS id_localidade,
-            uf
+            MD5(COALESCE(uf, 'NI') || '_' || COALESCE(latitude::VARCHAR, '0') || '_' || COALESCE(longitude::VARCHAR, '0')) AS id_localidade,
+            uf,
+            latitude,
+            longitude
         FROM v_trusted;
     """)
 
@@ -63,9 +70,10 @@ def main():
         FROM v_trusted;
     """)
 
-    # 3. CRIAÇÃO DA TABELA FATO (fato_acidentes_veiculos) 
-    print("📊 Modelando Tabela Fato e computando métricas numéricas...")
-    # Estratégia Blindada: Usamos ROW_NUMBER() para criar um índice sequencial único para gerar as datas sem depender de nenhuma coluna de data original
+    # =====================================================================
+    # 3. CRIAÇÃO DA TABELA FATO (fato_acidentes_veiculos)
+    # =====================================================================
+    print("📊 Modelando Tabela Fato e mapeando métricas geográficas numéricas...")
     con.execute("""
     CREATE TABLE fato_acidentes_veiculos AS
     WITH sequenciando AS (
@@ -76,36 +84,52 @@ def main():
             br,  
             tipo_envolvido,
             estado_fisico,
+            latitude,
+            longitude,
             ROW_NUMBER() OVER() AS r_num
         FROM v_trusted
     )
     SELECT 
         id_acidente_original,
         id_veiculo_original,
+        
+        -- AJUSTE CRÍTICO: Mantendo a coluna 'br' com o nome original exigido pelo app.py
+        br,
         br AS rodovia_original, 
+        
+        latitude,
+        longitude,
+        
         CAST('2021-01-01' AS DATE) + CAST((r_num % 1825) AS INTEGER) AS id_data,
-        MD5(COALESCE(uf, 'NI')) AS id_localidade,
+        
+        -- AJUSTE CRÍTICO: Chave estrangeira composta igual à da dim_localidade para evitar explosão cartesiana
+        MD5(COALESCE(uf, 'NI') || '_' || COALESCE(latitude::VARCHAR, '0') || '_' || COALESCE(longitude::VARCHAR, '0')) AS id_localidade,
+        
         MD5(COALESCE(tipo_envolvido, 'NI')) AS id_envolvido,
         1 AS qtd_registros_envolvidos,
-        -- FLAG DE ÓBITO: Corrigido para comentário SQL aceito pelo DuckDB
+        
         CASE WHEN LOWER(estado_fisico) IN ('morto', 'óbito', 'obito') THEN 1 ELSE 0 END AS is_fatal,
         COUNT(DISTINCT id_veiculo_original) OVER(PARTITION BY id_acidente_original) AS total_veiculos_no_acidente
     FROM sequenciando;
-""")
+    """)
 
+    # =====================================================================
     # 4. IMPLEMENTAÇÃO DE VIEW KPI 
+    # =====================================================================
     con.execute("""
         CREATE VIEW v_kpi_envolvidos_por_uf AS
         SELECT 
             loc.uf,
-            COUNT(f.id_acidente_original) AS total_acidentes,
+            COUNT(DISTINCT f.id_acidente_original) AS total_acidentes,
             SUM(f.qtd_registros_envolvidos) AS total_envolvidos_afetados
         FROM fato_acidentes_veiculos f
         JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
         GROUP BY loc.uf;
     """)
 
+    # =====================================================================
     # 5. PERSISTÊNCIA EM ARQUIVOS PARQUET 
+    # =====================================================================
     print("💾 Gravando tabelas dimensionais em data/mart/ (Formato Parquet)...")
     
     tabelas_mart = ["dim_calendario", "dim_localidade", "dim_envolvido", "fato_acidentes_veiculos"]
@@ -119,7 +143,9 @@ def main():
         relatorio_linhas[tabela] = qtd_linhas
         print(f"  └─> {tabela}.parquet salvo com sucesso.")
 
+    # =====================================================================
     # 6. RELATÓRIO DE VOLUMETRIA IMPRESSO 
+    # =====================================================================
     print("\n==========================================================")
     print("📊 RESUMO DE CONSTRUÇÃO DA CAMADA MART - SPRINT 3")
     print("==========================================================")
