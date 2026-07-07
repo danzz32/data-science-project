@@ -34,6 +34,8 @@ A camada final do pipeline (Mart), construída em <code>src/build_mart.py</code>
 
 > ⚠️ **Nota sobre a dimensão calendário:** como a camada Trusted não possui uma coluna de data original confiável para o relacionamento, `id_data_fato` é atribuído de forma sequencial/cíclica (via `ROW_NUMBER()` sobre uma janela de 1825 dias) e não representa a data real do acidente. Essa limitação deve ser tratada em uma próxima iteração do pipeline (ex.: recuperar a data original da fonte PRF).
 
+> ⚠️ **Nota sobre colunas consumidas pelo dashboard:** o dashboard (`app.py`) faz referência a colunas adicionais na tabela fato — como flag de acidente fatal, identificador de rodovia e sigla da BR — que ainda não estão descritas na tabela acima nem no dicionário de dados. Antes de rodar o dashboard contra a base real, confira em `src/build_mart.py` e em [`schemas/`](./schemas) se esses campos já existem em `fato_acidentes_veiculos` com esses nomes; caso contrário, será necessário expor essas colunas na camada Mart (ou ajustar as queries do dashboard para os nomes reais) para que as visualizações de severidade e de rodovias críticas funcionem corretamente.
+
 **View analítica:**
 
 - `v_kpi_envolvidos_por_uf` — agregação de `fato_acidentes_veiculos` por UF, com total de acidentes e total de envolvidos afetados.
@@ -116,6 +118,8 @@ source .venv/bin/activate  # Linux/macOS
 ```bash
 uv sync
 ```
+
+> As bibliotecas usadas pelo dashboard interativo (`streamlit`, `streamlit-shadcn-ui`, `duckdb`, `pandas` e `plotly`) já fazem parte das dependências declaradas em `pyproject.toml` e são instaladas junto com o restante do projeto por esse mesmo comando.
 
 ### 📓 Configurar Jupyter (opcional)
 
@@ -204,7 +208,23 @@ uv run python src/build_mart.py
 
 Etapa responsável por estruturar os dados da camada Trusted no modelo dimensional (fato + dimensões) descrito na seção [Modelo Dimensional](#-modelo-dimensional), utilizando DuckDB. As tabelas (`dim_calendario`, `dim_localidade`, `dim_envolvido` e `fato_acidentes_veiculos`) são persistidas em formato Parquet em `data/mart/`, e um resumo de volumetria (quantidade de linhas por tabela) é impresso ao final da execução.
 
-### 4. Notebooks de Análise Exploratória
+### 4. Dashboard Interativo (Streamlit)
+
+```bash
+uv run streamlit run app.py
+```
+
+O comando sobe o dashboard em `http://localhost:8501`. A aplicação lê diretamente os arquivos Parquet da camada Mart (`data/mart/`) através de consultas DuckDB — portanto, é necessário ter executado a etapa anterior (Camada Mart) pelo menos uma vez antes de abrir o dashboard.
+
+O painel está organizado em:
+
+- **Filtros no topo** — Ano, Região, UF e critério de ranking de rodovias (maior/menor índice de acidentes), todos combináveis entre si.
+- **Cartões de indicadores (KPIs)** — Acidentes, Acidentes Fatais, Envolvidos, Índice de Letalidade e Registros Veículo-Envolvido, recalculados dinamicamente conforme os filtros aplicados.
+- **📍 Análise Geográfica & Rodovias** — volumetria de envolvidos por UF, mapa de dispersão geográfico das ocorrências e ranking Top 5 de rodovias federais.
+- **🪖 Perfil de Risco & Severidade** — distribuição de severidade (fatal x não fatal) por papel do envolvido, mapa de densidade de acidentes fatais e ranking das rodovias mais críticas.
+- **📅 Sazonalidade Temporal** — evolução mensal de ocorrências por ano (com rótulos de dados) e comparativo sobreposto entre os anos selecionados.
+
+### 5. Notebooks de Análise Exploratória
 
 Os notebooks de análise exploratória ficam em [`docs/`](./docs) e podem ser executados via VS Code/Jupyter selecionando o kernel:
 
@@ -214,7 +234,7 @@ uv run jupyter notebook docs/
 
 No VS Code: abra o arquivo `.ipynb`, clique em **Select Kernel** e escolha `data-science-project` (ou o interpretador da pasta `.venv`).
 
-### 5. Relatórios Quarto (.qmd)
+### 6. Relatórios Quarto (.qmd)
 
 Os relatórios `.qmd` ficam em [`reports/`](./reports) e podem ser renderizados via VS Code ou terminal:
 
@@ -237,6 +257,7 @@ Ao final da execução deste projeto, espera-se a geração de:
 2. **Análise de Periculosidade**: Identificação estatística dos fatores que mais contribuem para a gravidade das ocorrências (ex: relação entre condições climáticas e óbitos).
 3. **Séries Temporais**: Gráficos que demonstrem os períodos de maior vulnerabilidade (feriados, horários de pico ou sazonalidade mensal).
 4. **Relatório Consolidado**: Um conjunto de insights que correlacionam a infraestrutura viária do estado com o comportamento dos sinistros registrados pela PRF.
+5. **Dashboard Interativo**: Uma aplicação Streamlit que consolida os KPIs, mapas e séries temporais acima em um painel único, navegável por filtros de ano, região e UF, voltado a uma leitura executiva dos dados da Mart.
 </div>
 
 ---
@@ -256,6 +277,7 @@ data-science-project/
 │   ├── transform.py        # Transformação de dados (camada Trusted)
 │   ├── build_mart.py       # Construção do modelo dimensional (camada Mart)
 │   └── ...
+├── app.py                  # Dashboard interativo (Streamlit + DuckDB + Plotly)
 ├── docs/                   # Notebooks de análise exploratória (.ipynb)
 ├── reports/                # Relatórios Quarto (.qmd) e saída renderizada (.html)
 ├── schemas/                # Dicionário de dados
