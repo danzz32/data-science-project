@@ -34,7 +34,7 @@ A camada final do pipeline (Mart), construída em <code>src/build_mart.py</code>
 
 > ⚠️ **Nota sobre a dimensão calendário:** como a camada Trusted não possui uma coluna de data original confiável para o relacionamento, `id_data_fato` é atribuído de forma sequencial/cíclica (via `ROW_NUMBER()` sobre uma janela de 1825 dias) e não representa a data real do acidente. Essa limitação deve ser tratada em uma próxima iteração do pipeline (ex.: recuperar a data original da fonte PRF).
 
-> ⚠️ **Nota sobre colunas consumidas pelo dashboard:** o dashboard (`app.py`) faz referência a colunas adicionais na tabela fato — como flag de acidente fatal, identificador de rodovia e sigla da BR — que ainda não estão descritas na tabela acima nem no dicionário de dados. Antes de rodar o dashboard contra a base real, confira em `src/build_mart.py` e em [`schemas/`](./schemas) se esses campos já existem em `fato_acidentes_veiculos` com esses nomes; caso contrário, será necessário expor essas colunas na camada Mart (ou ajustar as queries do dashboard para os nomes reais) para que as visualizações de severidade e de rodovias críticas funcionem corretamente.
+> ℹ️ **Colunas adicionais consumidas pelo dashboard:** desde a Sprint 4, `fato_acidentes_veiculos` também expõe `br` / `rodovia_original` (rodovia), `latitude`/`longitude` (herdadas para a tabela fato para permitir mapas sem join adicional) e `is_fatal` (flag de óbito), e `dim_localidade` expõe `latitude`/`longitude`. Esses campos são gerados em `src/build_mart.py` e consumidos pelo `app.py` nas visualizações de severidade, mapas e ranking de rodovias. O dicionário de dados em [`docs/dicionario_dados.md`](./docs/dicionario_dados.md) ainda descreve apenas o esquema da Sprint 3 e deve ser atualizado para incluir essas colunas.
 
 **View analítica:**
 
@@ -236,15 +236,15 @@ No VS Code: abra o arquivo `.ipynb`, clique em **Select Kernel** e escolha `data
 
 ### 6. Relatórios Quarto (.qmd)
 
-Os relatórios `.qmd` ficam em [`reports/`](./reports) e podem ser renderizados via VS Code ou terminal:
+Os notebooks exploratórios (`docs/eda_qualidade.qmd`, `docs/eda_modelagem.qmd`) e o relatório executivo (`relatorio-executivo.qmd`, na raiz do projeto) podem ser renderizados via VS Code ou terminal:
 
 ```bash
 quarto render docs/eda_qualidade.qmd --output-dir ../reports
-
-quarto render reports/relatorio.qmd
+quarto render docs/eda_modelagem.qmd --output-dir ../reports
+quarto render relatorio-executivo.qmd
 ```
 
-A renderização gera o relatório final em HTML em [`reports/`](./reports) (ex.: `reports/relatorio.html`), contendo os mapas de calor interativos, gráficos e demais visualizações.
+Todos geram HTML em [`reports/`](./reports): `eda_qualidade.html`, `eda_modelagem.html` e `relatorio-executivo.html`. Este último é o **relatório executivo** pedido na Sprint 4 — dirigido a quem vai decidir, não a quem vai auditar o pipeline. Ele responde a perguntas analíticas com narrativa Contexto → Dados → Conclusão, reaproveitando consultas e visualizações da Sprint 3, mas com texto escrito para um público não técnico. O HTML já vem commitado em `reports/relatorio-executivo.html`, então não é necessário rodar `quarto render` para lê-lo — apenas para gerá-lo novamente após alguma mudança.
 
 ---
 
@@ -264,7 +264,7 @@ Ao final da execução deste projeto, espera-se a geração de:
 
 ## 📖 Dicionário de Dados
 
-O dicionário de dados, com a descrição de cada coluna, tipo, domínio e regra de derivação das tabelas fato e dimensão, está disponível em [`schemas/`](./schemas).
+O dicionário de dados, com a descrição de cada coluna, tipo, domínio e regra de derivação das tabelas fato e dimensão, está disponível em [`docs/dicionario_dados.md`](./docs/dicionario_dados.md).
 
 ---
 
@@ -278,9 +278,10 @@ data-science-project/
 │   ├── build_mart.py       # Construção do modelo dimensional (camada Mart)
 │   └── ...
 ├── app.py                  # Dashboard interativo (Streamlit + DuckDB + Plotly)
-├── docs/                   # Notebooks de análise exploratória (.ipynb)
-├── reports/                # Relatórios Quarto (.qmd) e saída renderizada (.html)
-├── schemas/                # Dicionário de dados
+├── relatorio-executivo.qmd # Fonte do relatório executivo (Sprint 4)
+├── docs/                   # Notebooks de análise exploratória (.qmd) + dicionário de dados
+├── reports/                # Saída renderizada (.html) de todos os relatórios Quarto
+├── schemas/                # Reservado para versionamento futuro de schemas formais
 ├── data/
 │   ├── raw/                # Dados brutos (imutáveis)
 │   ├── trusted/            # Dados transformados e validados
