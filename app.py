@@ -522,6 +522,119 @@ if dados_carregados:
                 except Exception as e:
                     st.error(f"⚠️ Erro ao carregar os dados das BRs: {e}")
 
+                    # -----------------------------------------------------------------
+            # NOVO BLOCO: Ranking e Mapa de Letalidade por Estado (UF)
+            # -----------------------------------------------------------------
+            st.markdown(
+                '<div class="section-subtitle">📊 Letalidade por Estado: % de Acidentes Fatais</div>',
+                unsafe_allow_html=True,
+            )
+
+            query_letalidade = f"""
+                WITH total_por_uf AS (
+                    SELECT
+                        loc.uf,
+                        AVG(loc.latitude) AS latitude, -- Média para centralizar o ponto no estado
+                        AVG(loc.longitude) AS longitude,
+                        COUNT(CASE WHEN f.is_fatal = 1 THEN 1 END) AS acidentes_fatais,
+                        COUNT(*) AS total_acidentes
+                    FROM fato_acidentes_veiculos f
+                    JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
+                    JOIN dim_calendario cal ON f.id_data = cal.id_data
+                    WHERE loc.uf IN ({str_ufs_finais})
+                      AND cal.ano IN ({str_anos})
+                    GROUP BY loc.uf
+                )
+                SELECT
+                    uf AS "Estado",
+                    latitude,
+                    longitude,
+                    acidentes_fatais AS "Acidentes Fatais",
+                    total_acidentes AS "Total de Acidentes",
+                    ROUND((acidentes_fatais * 100.0) / total_acidentes, 2) AS "Percentual Fatal (%)"
+                FROM total_por_uf
+                WHERE total_acidentes > 0
+                ORDER BY "Percentual Fatal (%)" DESC;
+            """
+
+            try:
+                df_letalidade = con_query.execute(query_letalidade).df()
+
+                if not df_letalidade.empty:
+                    # Criando duas colunas de tamanhos iguais
+                    col_rank, col_mapa_let = st.columns([1, 1])
+
+                    with col_rank:
+                        fig_letalidade = px.bar(
+                            df_letalidade,
+                            x="Percentual Fatal (%)",
+                            y="Estado",
+                            orientation="h",
+                            text="Percentual Fatal (%)",
+                            labels={
+                                "Percentual Fatal (%)": "Casos Fatais (%)",
+                                "Estado": "UF"
+                            },
+                            color="Percentual Fatal (%)",
+                            color_continuous_scale=[PRF_BLUE, PRF_YELLOW, PRF_RED],
+                        )
+                        
+                        fig_letalidade.update_traces(
+                            texttemplate="%{text}%", 
+                            textposition="outside"
+                        )
+                        
+                        fig_letalidade.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)", 
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            yaxis={"categoryorder": "total ascending"},
+                            margin={"r": 40, "t": 10, "l": 0, "b": 10}, 
+                            height=380, # Altura fixa para alinhar com o mapa ao lado
+                            coloraxis_showscale=False,
+                        )
+                        st.plotly_chart(fig_letalidade, use_container_width=True)
+
+                    with col_mapa_let:
+                        # Mapa de bolhas (scatter_mapbox) onde o tamanho e a cor refletem a letalidade
+                        fig_mapa_let = px.scatter_mapbox(
+                            df_letalidade,
+                            lat="latitude",
+                            lon="longitude",
+                            size="Percentual Fatal (%)",
+                            color="Percentual Fatal (%)",
+                            color_continuous_scale=[PRF_BLUE, PRF_YELLOW, PRF_RED],
+                            size_max=22,
+                            zoom=3,
+                            center=dict(lat=-15.78, lon=-47.93),
+                            mapbox_style="carto-positron",
+                            labels={"Percentual Fatal (%)": "Letalidade (%)", "Estado": "Estado"},
+                            hover_data={
+                                "Estado": True, 
+                                "Percentual Fatal (%)": ":.2f%", 
+                                "Total de Acidentes": True,
+                                "latitude": False,
+                                "longitude": False
+                            }
+                        )
+                        
+                        fig_mapa_let.update_traces(
+                            marker=dict(color=PRF_RED) # Ou "#FF0000" caso a variável PRF_RED não seja uma string de cor válida aqui
+                        )
+                        
+                        fig_mapa_let.update_layout(
+                            margin={"r": 0, "t": 10, "l": 0, "b": 10}, 
+                            height=380, 
+                            coloraxis_showscale=False
+                        )
+                        st.plotly_chart(fig_mapa_let, use_container_width=True)
+                else:
+                    st.info("ℹ️ Sem dados suficientes para calcular o ranking e o mapa de letalidade.")
+            except Exception as e:
+                st.error(f"⚠️ Erro ao carregar a análise de letalidade: {e}")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            # -----------------------------------------------------------------
+
         # =====================================================================
         # ABA 3: SAZONALIDADE TEMPORAL
         # =====================================================================
