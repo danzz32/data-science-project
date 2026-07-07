@@ -75,3 +75,6 @@ logs/
 *.temp
 .tmp/
 docs/.tmp
+
+/.quarto/
+**/*.quarto_ipynb
