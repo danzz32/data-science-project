@@ -1,34 +1,112 @@
 import streamlit as st
+import streamlit_shadcn_ui as ui
 import duckdb
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
 
-# Configuração da página do Streamlit
+# ===================================================================================
+# 1. CONFIGURAÇÃO DA PÁGINA E CONSTANTES VISUAIS (mesma paleta do Observatório PRF)
+# ===================================================================================
+PRF_ICON      = "https://upload.wikimedia.org/wikipedia/commons/1/1b/PRF_new.png"
+PRF_NAVY      = "#0B1F3A"
+PRF_NAVY_2    = "#142E52"
+PRF_BLUE      = "#1E88E5"
+PRF_BLUE_DARK = "#0D47A1"
+PRF_YELLOW    = "#FFC400"
+PRF_RED       = "#E53935"
+PRF_GRAY_BG   = "#F1F3F6"
+PRF_GRAY_TXT  = "#6B7280"
+PRF_CARD_BG   = "#FFFFFF"
+
 st.set_page_config(
-    page_title="Dashboard Analítico - PRF Ocorrências",
-    page_icon="📊",
-    layout="wide"
+    page_title="PRF | Dashboard Analítico de Ocorrências",
+    page_icon=PRF_ICON,
+    layout="wide",
 )
 
-# 1. FUNÇÃO DE CARREGAMENTO COM CACHE (Isolamento da camada Mart)
+st.markdown(
+    f"""
+    <style>
+    .stApp {{ background-color: {PRF_GRAY_BG}; }}
+    #MainMenu, footer {{ visibility: hidden; }}
+
+    .header-banner {{
+        background: linear-gradient(90deg, {PRF_NAVY} 0%, {PRF_NAVY_2} 100%);
+        padding: 16px 26px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        margin-bottom: 18px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+    }}
+    .header-banner img {{ height: 46px; margin-right: 16px; }}
+    .header-title {{ color: #FFFFFF; margin: 0; font-family: 'Segoe UI', Arial, sans-serif;
+                      font-size: 23px; font-weight: 700; letter-spacing: .3px; }}
+    .header-subtitle {{ color: #AEB8C4; font-size: 12px; margin-left: auto;
+                         text-transform: uppercase; letter-spacing: 1.5px; text-align: right; }}
+
+    .section-subtitle {{
+        color: {PRF_NAVY}; font-size: 15px; font-weight: 700; margin: 4px 0 10px 0;
+        border-left: 4px solid {PRF_BLUE}; padding-left: 9px;
+    }}
+    
+    .section-title {{
+        color: {PRF_NAVY}; font-size: 20px; font-weight: 700; margin: 4px 0 10px 0;
+        border-left: 4px solid {PRF_BLUE}; padding-left: 9px;
+    }}
+    
+    .filter-caption {{ font-size: 11px; color: {PRF_GRAY_TXT}; font-weight: 700;
+                        text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ===================================================================================
+# 2. CABEÇALHO
+# ===================================================================================
+st.markdown(
+    f"""
+    <div class="header-banner">
+        <img src="{PRF_ICON}">
+        <h1 class="header-title" style="color:#fff">MONITORAMENTO ANALÍTICO DE ACIDENTES E VEÍCULOS</h1>
+        <div class="header-subtitle">Camada Mart &middot; PRF</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ===================================================================================
+# 3. CARREGAMENTO DE DADOS (mantido: leitura da camada Mart via DuckDB/Parquet)
+# ===================================================================================
 @st.cache_data
 def carregar_dados_mart():
     base_dir = Path(__file__).resolve().parent
     mart_dir = base_dir / "data" / "mart"
-    
+
     con = duckdb.connect(database=":memory:")
-    
+
     con.execute(f"CREATE TABLE dim_calendario AS SELECT * FROM read_parquet('{mart_dir / 'dim_calendario.parquet'}')")
     con.execute(f"CREATE TABLE dim_localidade AS SELECT * FROM read_parquet('{mart_dir / 'dim_localidade.parquet'}')")
     con.execute(f"CREATE TABLE dim_envolvido AS SELECT * FROM read_parquet('{mart_dir / 'dim_envolvido.parquet'}')")
     con.execute(f"CREATE TABLE fato_acidentes_veiculos AS SELECT * FROM read_parquet('{mart_dir / 'fato_acidentes_veiculos.parquet'}')")
-    
+
     df_calendario = con.execute("SELECT * FROM dim_calendario").df()
     df_localidade = con.execute("SELECT * FROM dim_localidade").df()
-    
+
     con.close()
     return df_calendario, df_localidade
+
+
+def fmt_num(n: float) -> str:
+    """Formata número no padrão brasileiro (ponto como separador de milhar)."""
+    return f"{n:,.0f}".replace(",", ".")
+
+
+def _safe_int(x) -> int:
+    return int(x) if pd.notna(x) else 0
+
 
 try:
     df_cal, df_loc = carregar_dados_mart()
@@ -38,63 +116,52 @@ except Exception as e:
     dados_carregados = False
 
 if dados_carregados:
-    st.title("📊 Monitoramento Analítico de Acidentes e Veículos")
-    st.markdown("Interface executiva para exploração de indicadores geográficos, sazonais e de perfil de risco baseada na camada Mart.")
-    st.markdown("---")
-    
-    # 2. PAINEL DE CONTROLE UNIFICADO (BARRA LATERAL PRF)
-    st.sidebar.header("🎯 Painel de Filtros Integrados")
-    
-    # Filtro 1: Sazonalidade (Anos)
-    lista_anos = sorted(df_cal['ano'].unique())
-    anos_selecionados = st.sidebar.multiselect(
-        "1. Selecione os Anos:",
-        options=lista_anos,
-        default=lista_anos
-    )
-    
-    st.sidebar.markdown("---")
-    
-    # Filtro 2: Macrorregiões
+
+    # ===============================================================================
+    # 4. FILTROS (movidos para o topo da página, no mesmo padrão visual do Observatório)
+    # ===============================================================================
+    st.markdown('<div class="filter-caption">FILTROS</div>', unsafe_allow_html=True)
+
     mapeamento_regioes = {
         "Norte": ["ac", "am", "pa", "ro", "rr", "to"],
         "Nordeste": ["al", "ba", "ce", "ma", "pb", "pe", "pi", "rn", "se"],
         "Centro-Oeste": ["df", "go", "mt", "ms"],
         "Sudeste": ["es", "mg", "rj", "sp"],
-        "Sul": ["pr", "rs", "sc"]
+        "Sul": ["pr", "rs", "sc"],
     }
-    
-    regioes_selecionadas = st.sidebar.multiselect(
-        "2. Selecione as Regiões:",
-        options=list(mapeamento_regioes.keys()),
-        default=list(mapeamento_regioes.keys())
-    )
-    
+
+    f1, f2, f3, f4 = st.columns([1, 1.4, 1.6, 1.6])
+
+    with f1:
+        lista_anos = sorted(df_cal["ano"].unique())
+        anos_selecionados = st.multiselect("Ano", options=lista_anos, default=lista_anos)
+
+    with f2:
+        regioes_selecionadas = st.multiselect(
+            "Região", options=list(mapeamento_regioes.keys()), default=list(mapeamento_regioes.keys())
+        )
+
     # Resolução estática para evitar listas nulas no primeiro carregamento
     ufs_permitidas = []
     for r in regioes_selecionadas:
         ufs_permitidas.extend(mapeamento_regioes[r])
     if not ufs_permitidas:
-        ufs_permitidas = df_loc['uf'].unique().tolist()
+        ufs_permitidas = df_loc["uf"].unique().tolist()
 
-    # Filtro 3: Estados (UFs)
-    lista_ufs_disponiveis = sorted([uf for uf in df_loc['uf'].unique() if uf in ufs_permitidas])
-    ufs_selecionadas = st.sidebar.multiselect(
-        "3. Refine por Estado (UF):",
-        options=lista_ufs_disponiveis,
-        default=lista_ufs_disponiveis
-    )
-    
-    st.sidebar.markdown("---")
-    
-    # Filtro 4: Seletor de Impacto de Rodovias
-    st.sidebar.subheader("🛣️ Foco em Rodovias (Top 5)")
-    criterio_rodovia = st.sidebar.radio(
-        "Escolha o critério de análise:",
-        options=["Maior índice de acidentes", "Menor índice de acidentes"]
-    )
+    with f3:
+        lista_ufs_disponiveis = sorted([uf for uf in df_loc["uf"].unique() if uf in ufs_permitidas])
+        ufs_selecionadas = st.multiselect("UF", options=lista_ufs_disponiveis, default=lista_ufs_disponiveis)
 
-    # Conexão interna DuckDB para queries analíticas
+    with f4:
+        criterio_rodovia = st.radio(
+            "Ranking de rodovias (Top 5)",
+            options=["Maior índice de acidentes", "Menor índice de acidentes"],
+            horizontal=True,
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Conexão interna DuckDB para queries analíticas (mantida sem alterações)
     mart_path = str(Path(__file__).resolve().parent / "data" / "mart")
     con_query = duckdb.connect(database=":memory:")
     con_query.execute(f"CREATE TABLE dim_calendario AS SELECT * FROM read_parquet('{mart_path}/dim_calendario.parquet')")
@@ -104,32 +171,71 @@ if dados_carregados:
 
     # VALIDAÇÃO DE SEGURANÇA ANTES DE INICIAR AS QUERIES
     ufs_para_query = ufs_selecionadas if ufs_selecionadas else ufs_permitidas
-    
+
     if not anos_selecionados:
-        st.warning("⚠️ Selecione pelo menos um Ano na barra lateral para carregar as análises.")
+        st.warning("⚠️ Selecione pelo menos um Ano nos filtros para carregar as análises.")
     elif not ufs_para_query:
         st.warning("⚠️ Selecione pelo menos uma Região ou Estado para carregar as análises.")
     else:
-        # Formatação das variáveis para strings SQL
         str_anos = ", ".join([str(int(a)) for a in anos_selecionados])
         str_ufs_finais = ", ".join([f"'{u}'" for u in ufs_para_query])
 
-        # =====================================================================
-        # CRIAÇÃO DAS ABAS GLOBAIS DO DASHBOARD
-        # =====================================================================
+        # ===========================================================================
+        # 5. KPIs GLOBAIS (mesmo padrão de cartões do Observatório)
+        # Observação: a camada Mart não expõe uma contagem numérica de vítimas/feridos
+        # por acidente (apenas o flag booleano is_fatal por registro), então os
+        # indicadores abaixo foram adaptados às colunas realmente disponíveis.
+        # ===========================================================================
+        query_kpis = f"""
+            SELECT
+                COUNT(DISTINCT f.id_acidente_original) AS total_acidentes,
+                COUNT(DISTINCT CASE WHEN f.is_fatal = 1 THEN f.id_acidente_original END) AS acidentes_fatais,
+                SUM(f.qtd_registros_envolvidos) AS total_envolvidos,
+                COUNT(*) AS registros_veiculo
+            FROM fato_acidentes_veiculos f
+            JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
+            JOIN dim_calendario cal ON f.id_data = cal.id_data
+            WHERE loc.uf IN ({str_ufs_finais}) AND cal.ano IN ({str_anos})
+        """
+        kpis = con_query.execute(query_kpis).df().iloc[0]
+        total_acidentes    = _safe_int(kpis["total_acidentes"])
+        acidentes_fatais   = _safe_int(kpis["acidentes_fatais"])
+        total_envolvidos   = _safe_int(kpis["total_envolvidos"])
+        registros_veiculo  = _safe_int(kpis["registros_veiculo"])
+        letalidade = (acidentes_fatais / total_acidentes * 100) if total_acidentes else 0
+
+        k1, k2, k3, k4, k5 = st.columns(5)
+        with k1:
+            ui.metric_card(title="", content=fmt_num(total_acidentes), description="ACIDENTES", key="kpi1")
+        with k2:
+            ui.metric_card(title="", content=fmt_num(acidentes_fatais), description="ACIDENTES FATAIS", key="kpi2")
+        with k3:
+            ui.metric_card(title="", content=fmt_num(total_envolvidos), description="ENVOLVIDOS", key="kpi3")
+        with k4:
+            ui.metric_card(title="", content=f"{letalidade:.1f}%", description="ÍNDICE DE LETALIDADE", key="kpi4")
+        with k5:
+            ui.metric_card(title="", content=fmt_num(registros_veiculo), description="REGISTROS VEÍCULO-ENVOLVIDO", key="kpi5")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ===========================================================================
+        # 6. ABAS (mesmos 3 recortes analíticos originais, com o estilo do Observatório)
+        # ===========================================================================
         tab_pergunta1, tab_pergunta2, tab_pergunta3 = st.tabs([
-            "📍 1. Análise Geográfica & Rodovias",
-            "🪖 2. Perfil de Risco & Severidade",
-            "📅 3. Sazonalidade Temporal"
+            "📍 Análise Geográfica & Rodovias",
+            "🪖 Perfil de Risco & Severidade",
+            "📅 Sazonalidade Temporal",
         ])
 
         # =====================================================================
-        # ABA 1: PERGUNTA 1 (Geografia com Gráfico de Barras + Mapa de Calor)
+        # ABA 1: GEOGRAFIA (Gráfico de Barras + Mapa + Ranking de Rodovias)
         # =====================================================================
         with tab_pergunta1:
-            st.header("📍 1. Concentração Geográfica Avançada e Mapeamento de Ocorrências")
-            
-            # Query Original 1a: Para alimentar o gráfico de barras por UF
+            st.markdown(
+                '<div class="section-title">Concentração Geográfica Avançada e Mapeamento de Ocorrências</div>',
+                unsafe_allow_html=True,
+            )
+
             query_p1 = f"""
                 WITH total_filtrado AS (
                     SELECT SUM(f.qtd_registros_envolvidos) AS total_geral
@@ -138,7 +244,7 @@ if dados_carregados:
                     JOIN dim_calendario cal ON f.id_data = cal.id_data
                     WHERE loc.uf IN ({str_ufs_finais}) AND cal.ano IN ({str_anos})
                 )
-                SELECT 
+                SELECT
                     UPPER(loc.uf) AS uf,
                     SUM(f.qtd_registros_envolvidos) AS total_envolvidos,
                     ROUND((SUM(f.qtd_registros_envolvidos) * 100.0) / COALESCE(FIRST(tf.total_geral), 1), 2) AS share_percentual
@@ -150,10 +256,9 @@ if dados_carregados:
                 GROUP BY loc.uf
                 ORDER BY total_envolvidos DESC
             """
-            
-            # Nova Query 1b: Agrupamento geográfico por coordenadas para plotar o Mapa de Pontos
+
             query_mapa = f"""
-                SELECT 
+                SELECT
                     CAST(loc.latitude AS DOUBLE) AS latitude,
                     CAST(loc.longitude AS DOUBLE) AS longitude,
                     UPPER(loc.uf) AS estado,
@@ -163,145 +268,144 @@ if dados_carregados:
                 JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
                 JOIN dim_calendario cal ON f.id_data = cal.id_data
                 WHERE loc.uf IN ({str_ufs_finais}) AND cal.ano IN ({str_anos})
-                  AND loc.latitude IS NOT NULL 
+                  AND loc.latitude IS NOT NULL
                   AND loc.longitude IS NOT NULL
                   AND CAST(loc.latitude AS VARCHAR) != '0'
                   AND CAST(loc.longitude AS VARCHAR) != '0'
                 GROUP BY loc.latitude, loc.longitude, loc.uf, f.rodovia_original
             """
-            
+
             df_p1 = con_query.execute(query_p1).df()
             df_mapa = con_query.execute(query_mapa).df()
-            
+
             if not df_p1.empty:
                 col1, col2 = st.columns([2, 3])
-                
+
                 with col1:
+                    st.markdown('<div class="section-subtitle">Volumetria de Envolvidos por UF</div>', unsafe_allow_html=True)
                     fig_p1 = px.bar(
-                        df_p1, x='uf', y='total_envolvidos', text='share_percentual',
-                        labels={'uf': 'Estado (UF)', 'total_envolvidos': 'Total de Envolvidos'},
-                        title="Volumetria de Envolvidos por UF (%)",
-                        color='total_envolvidos', color_continuous_scale='Reds'
+                        df_p1.sort_values("total_envolvidos"), x="total_envolvidos", y="uf", orientation="h",
+                        text="share_percentual", color_discrete_sequence=[PRF_BLUE],
+                        labels={"uf": "Estado (UF)", "total_envolvidos": "Total de Envolvidos"},
                     )
-                    fig_p1.update_traces(texttemplate='%{text}%', textposition='outside')
+                    fig_p1.update_traces(texttemplate="%{text}%", textposition="outside")
+                    fig_p1.update_layout(
+                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                        margin={"r": 30, "t": 5, "l": 5, "b": 5}, height=380,
+                        xaxis_title=None, yaxis_title=None,
+                    )
                     st.plotly_chart(fig_p1, use_container_width=True)
-                
+
                 with col2:
+                    st.markdown('<div class="section-subtitle">Distribuição Espacial de Acidentes</div>', unsafe_allow_html=True)
                     if not df_mapa.empty:
                         fig_map = px.scatter_mapbox(
-                            df_mapa,
-                            lat="latitude",
-                            lon="longitude",
-                            size="numero_acidentes",
-                            color="numero_acidentes",
-                            color_continuous_scale="YlOrRd", 
-                            opacity=0.8,
-                            zoom=3.5,
-                            mapbox_style="carto-positron", 
-                            title="Distribuição Espacial de Acidentes (Alto Contraste)",
-                            labels={'numero_acidentes': 'Nº de Acidentes', 'estado': 'Estado', 'rodovia': 'Rodovia'},
+                            df_mapa, lat="latitude", lon="longitude",
+                            size="numero_acidentes", color="numero_acidentes",
+                            zoom=3.2, mapbox_style="carto-positron", height=380, opacity=0.85,
+                            color_continuous_scale=[PRF_BLUE, PRF_YELLOW, PRF_RED],
                             hover_name="rodovia",
                             hover_data={
-                                "estado": True,
-                                "rodovia": False,
-                                "numero_acidentes": True,
-                                "latitude": False,
-                                "longitude": False
-                            }
+                                "estado": True, "rodovia": False, "numero_acidentes": True,
+                                "latitude": False, "longitude": False,
+                            },
                         )
-                        fig_map.update_layout(
-                            margin={"r":0, "t":40, "l":0, "b":0},
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)"
-                        )
+                        fig_map.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0}, coloraxis_showscale=False)
                         st.plotly_chart(fig_map, use_container_width=True)
                     else:
                         st.info("ℹ️ Coordenadas geográficas ausentes para renderização do mapa.")
             else:
                 st.info("ℹ️ Nenhuma ocorrência encontrada para os filtros selecionados.")
 
-            st.markdown("---")
-            
-            # Ranking de Rodovias (Top 5)
-            st.subheader(f"🛣️ Top 5 Rodovias Federais - {criterio_rodovia}")
-            
+            st.markdown("<br>", unsafe_allow_html=True)
+
             coluna_metrica = "COUNT(DISTINCT f.id_acidente_original)"
             label_eixo_y = "Total de Acidentes"
             ordenacao_sql = "DESC" if criterio_rodovia == "Maior índice de acidentes" else "ASC"
-            cor_grafico = "Oranges" if ordenacao_sql == "DESC" else "Blues"
-            titulo_grafico = f"As 5 Rodovias do Escopo Selecionado com {criterio_rodovia}"
-            
+            cor_barra = PRF_BLUE if ordenacao_sql == "DESC" else PRF_NAVY
+
+            st.markdown(
+                f'<div class="section-subtitle">🛣️ Top 5 Rodovias Federais — {criterio_rodovia}</div>',
+                unsafe_allow_html=True,
+            )
+
             query_rodovias = f"""
-                SELECT 
+                SELECT
                     'BR-' || LPAD(CAST(f.rodovia_original AS VARCHAR), 3, '0') AS rodovia,
                     STRING_AGG(DISTINCT UPPER(loc.uf), ', ') AS estados,
                     {coluna_metrica} AS valor_indicador
                 FROM fato_acidentes_veiculos f
                 JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
                 JOIN dim_calendario cal ON f.id_data = cal.id_data
-                WHERE loc.uf IN ({str_ufs_finais}) 
+                WHERE loc.uf IN ({str_ufs_finais})
                   AND cal.ano IN ({str_anos})
-                  AND f.rodovia_original IS NOT NULL 
-                  AND CAST(f.rodovia_original AS VARCHAR) != '' 
+                  AND f.rodovia_original IS NOT NULL
+                  AND CAST(f.rodovia_original AS VARCHAR) != ''
                   AND CAST(f.rodovia_original AS VARCHAR) != '0'
                 GROUP BY f.rodovia_original
                 ORDER BY valor_indicador {ordenacao_sql}
                 LIMIT 5
             """
-            
+
             df_rodovias = con_query.execute(query_rodovias).df()
-            
+
             if not df_rodovias.empty:
                 col_r1, col_r2 = st.columns([3, 2])
                 with col_r1:
                     fig_rodovias = px.bar(
-                        df_rodovias, x='rodovia', y='valor_indicador', text='valor_indicador',
-                        labels={'rodovia': 'Rodovia Federal', 'valor_indicador': label_eixo_y},
-                        title=titulo_grafico,
-                        color='valor_indicador', color_continuous_scale=cor_grafico
+                        df_rodovias.sort_values("valor_indicador"), x="valor_indicador", y="rodovia", orientation="h",
+                        text="valor_indicador", color_discrete_sequence=[cor_barra],
+                        labels={"rodovia": "Rodovia Federal", "valor_indicador": label_eixo_y},
                     )
-                    fig_rodovias.update_traces(textposition='outside')
+                    fig_rodovias.update_traces(texttemplate="%{text:,}", textposition="outside")
+                    fig_rodovias.update_layout(
+                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                        margin={"r": 30, "t": 5, "l": 5, "b": 5}, height=320,
+                        xaxis_title=None, yaxis_title=None,
+                    )
                     st.plotly_chart(fig_rodovias, use_container_width=True)
                 with col_r2:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.dataframe(
                         df_rodovias.rename(columns={
-                            'rodovia': 'Rodovia (BR)', 
-                            'estados': 'Estado(s)', 
-                            'valor_indicador': label_eixo_y
+                            "rodovia": "Rodovia (BR)",
+                            "estados": "Estado(s)",
+                            "valor_indicador": label_eixo_y,
                         }),
-                        use_container_width=True, hide_index=True
+                        use_container_width=True, hide_index=True,
                     )
             else:
                 st.info("ℹ️ Não foram encontrados registros de rodovias válidas.")
 
         # =====================================================================
-        # ABA 2: PERGUNTA 2 (Perfil de Risco & Severidade Atualizado)
+        # ABA 2: PERFIL DE RISCO & SEVERIDADE
         # =====================================================================
         with tab_pergunta2:
-            st.header("🪖 2. Distribuição de Severidade por Papel do Envolvido")
-            
-            # Query utilizando Window Function para calcular a porcentagem por linha/categoria
+            st.markdown(
+                '<div class="section-subtitle">Distribuição de Severidade por Papel do Envolvido</div>',
+                unsafe_allow_html=True,
+            )
+
             query_p2 = f"""
                 WITH total_por_papel AS (
-                    SELECT 
+                    SELECT
                         CONCAT(UPPER(SUBSTR(env.tipo_envolvido, 1, 1)), LOWER(SUBSTR(env.tipo_envolvido, 2))) AS papel_envolvido,
-                        CASE 
-                            WHEN f.is_fatal = 1 THEN 'Fatal (Óbito)' 
-                            ELSE 'Não Fatal (Ferido/Ileso)' 
+                        CASE
+                            WHEN f.is_fatal = 1 THEN 'Fatal (Óbito)'
+                            ELSE 'Não Fatal (Ferido/Ileso)'
                         END AS severidade,
                         SUM(f.qtd_registros_envolvidos) AS total_pessoas
                     FROM fato_acidentes_veiculos f
                     JOIN dim_envolvido env ON f.id_envolvido = env.id_envolvido
                     JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
                     JOIN dim_calendario cal ON f.id_data = cal.id_data
-                    WHERE loc.uf IN ({str_ufs_finais}) 
+                    WHERE loc.uf IN ({str_ufs_finais})
                       AND cal.ano IN ({str_anos})
-                      AND env.tipo_envolvido IS NOT NULL 
+                      AND env.tipo_envolvido IS NOT NULL
                       AND env.tipo_envolvido != 'nao_informado'
                     GROUP BY papel_envolvido, severidade
                 )
-                SELECT 
+                SELECT
                     papel_envolvido,
                     severidade,
                     total_pessoas,
@@ -309,59 +413,50 @@ if dados_carregados:
                 FROM total_por_papel
                 ORDER BY total_pessoas DESC;
             """
-            
+
             df_p2 = con_query.execute(query_p2).df()
-            
+
             if not df_p2.empty:
-                # Criando o gráfico mantendo o tamanho real (volumetria bruta)
                 fig_p2 = px.bar(
                     df_p2,
                     x="total_pessoas",
                     y="papel_envolvido",
                     color="severidade",
-                    text="percentual_papel", 
+                    text="percentual_papel",
                     orientation="h",
-                    title="🔥 Perfil de Severidade e Volumetria por Papel do Envolvido",
                     labels={
                         "total_pessoas": "Total de Pessoas Afetadas",
                         "papel_envolvido": "Papel do Envolvido",
-                        "severidade": "Classificação do Caso"
+                        "severidade": "Classificação do Caso",
                     },
                     color_discrete_map={
-                        "Fatal (Óbito)": "#D32F2F",
-                        "Não Fatal (Ferido/Ileso)": "#1976D2"
+                        "Fatal (Óbito)": PRF_RED,
+                        "Não Fatal (Ferido/Ileso)": PRF_BLUE,
                     },
-                    barmode="stack" 
+                    barmode="stack",
                 )
-                
-                fig_p2.update_traces(
-                    texttemplate='%{text}%', 
-                    textposition='inside',
-                    insidetextanchor='middle'
-                )
-                
+                fig_p2.update_traces(texttemplate="%{text}%", textposition="inside", insidetextanchor="middle")
                 fig_p2.update_layout(
-                    yaxis={'categoryorder': 'total ascending'},
-                    margin={"r": 20, "t": 50, "l": 0, "b": 40},
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    yaxis={"categoryorder": "total ascending"},
+                    margin={"r": 20, "t": 10, "l": 0, "b": 40}, height=340,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 )
                 st.plotly_chart(fig_p2, use_container_width=True)
             else:
                 st.info("ℹ️ Sem dados para os envolvidos neste escopo.")
 
-            # -----------------------------------------------------------------
-            # MAPA DE ACIDENTES FATAIS & TABELA TOP 5 BRs
-            # -----------------------------------------------------------------
-            st.markdown("---")
-            st.subheader("📍 Análise Geográfica de Ocorrências Fatais")
-            
-            # Criando duas colunas na tela (Proporção 2 para o Mapa, 1 para a Tabela)
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(
+                '<div class="section-subtitle">📍 Análise Geográfica de Ocorrências Fatais</div>',
+                unsafe_allow_html=True,
+            )
+
             col_mapa, col_tabela = st.columns([2, 1])
-            
+
             with col_mapa:
-                # 1. Query para o Mapa de Calor
                 query_mapa_fatal = f"""
-                    SELECT 
+                    SELECT
                         loc.latitude,
                         loc.longitude,
                         loc.uf,
@@ -369,85 +464,75 @@ if dados_carregados:
                     FROM fato_acidentes_veiculos f
                     JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
                     JOIN dim_calendario cal ON f.id_data = cal.id_data
-                    WHERE loc.uf IN ({str_ufs_finais}) 
+                    WHERE loc.uf IN ({str_ufs_finais})
                       AND cal.ano IN ({str_anos})
-                      AND f.is_fatal = 1  
-                      AND loc.latitude IS NOT NULL 
+                      AND f.is_fatal = 1
+                      AND loc.latitude IS NOT NULL
                       AND loc.longitude IS NOT NULL
                     GROUP BY loc.latitude, loc.longitude, loc.uf;
                 """
-                
+
                 df_mapa_fatal = con_query.execute(query_mapa_fatal).df()
-                
+
                 if not df_mapa_fatal.empty:
                     fig_mapa_fatal = px.density_mapbox(
                         df_mapa_fatal,
-                        lat="latitude",     
-                        lon="longitude",    
+                        lat="latitude",
+                        lon="longitude",
                         z="total_acidentes",
                         radius=12,
                         center=dict(lat=-15.78, lon=-47.93),
                         zoom=3,
-                        mapbox_style="open-street-map", 
-                        color_continuous_scale="Reds",  # 🎯 Escala em tons de vermelho ativada
-                        title="🔥 Concentração de Ocorrências Fatais",
+                        mapbox_style="carto-positron",
+                        color_continuous_scale=[PRF_BLUE, PRF_YELLOW, PRF_RED],
                         labels={"total_acidentes": "Nº de Acidentes Fatais", "uf": "Estado"},
-                        hover_data={"uf": True, "total_acidentes": True}
+                        hover_data={"uf": True, "total_acidentes": True},
                     )
-                    
                     fig_mapa_fatal.update_layout(
-                        margin={"r": 0, "t": 40, "l": 0, "b": 0},
-                        height=500
+                        margin={"r": 0, "t": 0, "l": 0, "b": 0}, height=380, coloraxis_showscale=False,
                     )
-                    
                     st.plotly_chart(fig_mapa_fatal, use_container_width=True)
                 else:
                     st.warning("⚠️ Sem dados georreferenciados para o mapa neste escopo.")
-            
+
             with col_tabela:
-                st.markdown("<br><br>", unsafe_allow_html=True) # Alinhamento vertical simples
-                st.markdown("### 🏆 Top 5 Rodovias Críticas")
-                
-                # 2. Query corrigida: buscando a coluna 'br' diretamente da tabela fato (f) 🎯
+                st.markdown('<div class="section-subtitle">🏆 Top 5 Rodovias Críticas</div>', unsafe_allow_html=True)
+
                 query_top_brs = f"""
-                    SELECT 
+                    SELECT
                         COALESCE(f.br, 'Não Informada') AS "Rodovia",
                         COUNT(*) AS "Acidentes Fatais"
                     FROM fato_acidentes_veiculos f
                     JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
                     JOIN dim_calendario cal ON f.id_data = cal.id_data
-                    WHERE loc.uf IN ({str_ufs_finais}) 
+                    WHERE loc.uf IN ({str_ufs_finais})
                       AND cal.ano IN ({str_anos})
                       AND f.is_fatal = 1
                     GROUP BY f.br
                     ORDER BY COUNT(*) DESC
                     LIMIT 5;
                 """
-                
+
                 try:
                     df_top_brs = con_query.execute(query_top_brs).df()
-                    
                     if not df_top_brs.empty:
-                        # Exibe uma tabela limpa e elegante nativa do Streamlit
-                        st.dataframe(
-                            df_top_brs, 
-                            use_container_width=True, 
-                            hide_index=True
-                        )
+                        st.dataframe(df_top_brs, use_container_width=True, hide_index=True)
                     else:
                         st.info("ℹ️ Nenhuma ocorrência fatal registrada.")
                 except Exception as e:
-                    # Caso o nome do campo na fato seja ligeiramente diferente (ex: f.rodovia), exibe o erro técnico para sabermos o nome exato
                     st.error(f"⚠️ Erro ao carregar os dados das BRs: {e}")
-                
+
         # =====================================================================
-        # ABA 3: PERGUNTA 3 (Sazonalidade Temporal Sobreposta)
+        # ABA 3: SAZONALIDADE TEMPORAL
         # =====================================================================
         with tab_pergunta3:
-            st.header("📅 3. Comportamento e Sazonalidade Temporal por Ano")
-            
+            st.markdown(
+                '<div class="section-title">Comportamento e Sazonalidade Temporal por Ano</div>',
+                unsafe_allow_html=True,
+            )
+
             query_p3 = f"""
-                SELECT 
+                SELECT
                     CAST(cal.ano AS VARCHAR) AS ano,
                     cal.mes,
                     CASE cal.mes
@@ -464,37 +549,59 @@ if dados_carregados:
                 GROUP BY cal.ano, cal.mes, nome_mes
                 ORDER BY cal.ano ASC, cal.mes ASC
             """
-            
+
             df_p3 = con_query.execute(query_p3).df()
-            anos_retornados = sorted(df_p3['ano'].unique()) if not df_p3.empty else []
-            ordem_meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-            
+            anos_retornados = sorted(df_p3["ano"].unique()) if not df_p3.empty else []
+            ordem_meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+
             if len(anos_retornados) > 0:
                 lista_titulos_abas = [f"Ano {ano}" for ano in anos_retornados] + ["📈 Todos (Comparativo)"]
                 abas_anos = st.tabs(lista_titulos_abas)
-                
+
                 for i, ano in enumerate(anos_retornados):
                     with abas_anos[i]:
-                        df_ano = df_p3[df_p3['ano'] == ano]
-                        fig_p3_ano = px.line(
-                            df_ano, x='nome_mes', y='total_acidentes',
-                            labels={'nome_mes': 'Mês', 'total_acidentes': 'Quantidade de Ocorrências'},
-                            title=f"Evolução Mensal de Ocorrências - Histórico {ano}",
-                            markers=True
+                        st.markdown(
+                            f'<div class="section-subtitle">Evolução Mensal de Ocorrências — {ano}</div>',
+                            unsafe_allow_html=True,
                         )
-                        fig_p3_ano.update_layout(xaxis={'categoryorder': 'array', 'categoryarray': ordem_meses})
+                        df_ano = df_p3[df_p3["ano"] == ano]
+                        fig_p3_ano = px.line(
+                            df_ano, x="nome_mes", y="total_acidentes", markers=True, text="total_acidentes",
+                            labels={"nome_mes": "Mês", "total_acidentes": "Quantidade de Ocorrências"},
+                        )
+                        fig_p3_ano.update_traces(
+                            line_color=PRF_BLUE, textposition="top center",
+                            texttemplate="%{text:,}", textfont_size=11, cliponaxis=False,
+                        )
+                        fig_p3_ano.update_layout(
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            xaxis={"categoryorder": "array", "categoryarray": ordem_meses},
+                            margin={"r": 10, "t": 30, "l": 10, "b": 10}, height=320,
+                        )
                         st.plotly_chart(fig_p3_ano, use_container_width=True)
-                
+
                 with abas_anos[-1]:
-                    st.subheader("📊 Comparativo Sazonal Sobreposto (Ano contra Ano)")
-                    fig_comparativo = px.line(
-                        df_p3, x='nome_mes', y='total_acidentes', color='ano',
-                        labels={'nome_mes': 'Mês', 'total_acidentes': 'Quantidade de Ocorrências', 'ano': 'Ano de Análise'},
-                        title="Análise Cruzada de Sazonalidade: Históricos Sobrepostos",
-                        markers=True,
-                        color_discrete_sequence=px.colors.qualitative.Bold
+                    st.markdown(
+                        '<div class="section-title">📊 Comparativo Sazonal Sobreposto (Ano contra Ano)</div>',
+                        unsafe_allow_html=True,
                     )
-                    fig_comparativo.update_layout(xaxis={'categoryorder': 'array', 'categoryarray': ordem_meses})
+                    fig_comparativo = px.line(
+                        df_p3, x="nome_mes", y="total_acidentes", color="ano", markers=True, text="total_acidentes",
+                        labels={
+                            "nome_mes": "Mês", "total_acidentes": "Quantidade de Ocorrências", "ano": "Ano de Análise",
+                        },
+                        color_discrete_sequence=[PRF_NAVY, PRF_BLUE, PRF_YELLOW, PRF_RED, PRF_BLUE_DARK, PRF_GRAY_TXT],
+                    )
+                    fig_comparativo.update_traces(
+                        textposition="top center", texttemplate="%{text:,}",
+                        textfont_size=9, cliponaxis=False,
+                    )
+                    fig_comparativo.update_layout(
+                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                        xaxis={"categoryorder": "array", "categoryarray": ordem_meses},
+                        margin={"r": 10, "t": 30, "l": 10, "b": 10}, height=340,
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    )
                     st.plotly_chart(fig_comparativo, use_container_width=True)
             else:
                 st.info("ℹ️ Dados temporais indisponíveis para os filtros aplicados.")
