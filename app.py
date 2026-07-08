@@ -118,7 +118,7 @@ except Exception as e:
 if dados_carregados:
 
     # ===============================================================================
-    # 4. FILTROS (movidos para o topo da página, no mesmo padrão visual do Observatório)
+    # 4. FILTROS (Ajustados: Remoção do st.radio irrelevante)
     # ===============================================================================
     st.markdown('<div class="filter-caption">FILTROS</div>', unsafe_allow_html=True)
 
@@ -130,7 +130,7 @@ if dados_carregados:
         "Sul": ["pr", "rs", "sc"],
     }
 
-    f1, f2, f3, f4 = st.columns([1, 1.4, 1.6, 1.6])
+    f1, f2, f3 = st.columns([1, 1.5, 2.5])
 
     with f1:
         lista_anos = sorted(df_cal["ano"].unique())
@@ -152,16 +152,9 @@ if dados_carregados:
         lista_ufs_disponiveis = sorted([uf for uf in df_loc["uf"].unique() if uf in ufs_permitidas])
         ufs_selecionadas = st.multiselect("UF", options=lista_ufs_disponiveis, default=lista_ufs_disponiveis)
 
-    with f4:
-        criterio_rodovia = st.radio(
-            "Ranking de rodovias (Top 5)",
-            options=["Maior índice de acidentes", "Menor índice de acidentes"],
-            horizontal=True,
-        )
-
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Conexão interna DuckDB para queries analíticas (mantida sem alterações)
+    # Conexão interna DuckDB para queries analíticas
     mart_path = str(Path(__file__).resolve().parent / "data" / "mart")
     con_query = duckdb.connect(database=":memory:")
     con_query.execute(f"CREATE TABLE dim_calendario AS SELECT * FROM read_parquet('{mart_path}/dim_calendario.parquet')")
@@ -181,10 +174,7 @@ if dados_carregados:
         str_ufs_finais = ", ".join([f"'{u}'" for u in ufs_para_query])
 
         # ===========================================================================
-        # 5. KPIs GLOBAIS (mesmo padrão de cartões do Observatório)
-        # Observação: a camada Mart não expõe uma contagem numérica de vítimas/feridos
-        # por acidente (apenas o flag booleano is_fatal por registro), então os
-        # indicadores abaixo foram adaptados às colunas realmente disponíveis.
+        # 5. KPIs GLOBAIS
         # ===========================================================================
         query_kpis = f"""
             SELECT
@@ -219,7 +209,7 @@ if dados_carregados:
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ===========================================================================
-        # 6. ABAS (mesmos 3 recortes analíticos originais, com o estilo do Observatório)
+        # 6. ABAS
         # ===========================================================================
         tab_pergunta1, tab_pergunta2, tab_pergunta3 = st.tabs([
             "📍 Análise Geográfica & Rodovias",
@@ -319,13 +309,9 @@ if dados_carregados:
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            coluna_metrica = "COUNT(DISTINCT f.id_acidente_original)"
-            label_eixo_y = "Total de Acidentes"
-            ordenacao_sql = "DESC" if criterio_rodovia == "Maior índice de acidentes" else "ASC"
-            cor_barra = PRF_BLUE if ordenacao_sql == "DESC" else PRF_NAVY
-
+            # Ajustado para fixar a exibição no Top 5 de maior índice de acidentes de forma padrão
             st.markdown(
-                f'<div class="section-subtitle">🛣️ Top 5 Rodovias Federais — {criterio_rodovia}</div>',
+                '<div class="section-subtitle">🛣️ Top 5 Rodovias Federais — Maior índice de acidentes</div>',
                 unsafe_allow_html=True,
             )
 
@@ -333,7 +319,7 @@ if dados_carregados:
                 SELECT
                     'BR-' || LPAD(CAST(f.rodovia_original AS VARCHAR), 3, '0') AS rodovia,
                     STRING_AGG(DISTINCT UPPER(loc.uf), ', ') AS estados,
-                    {coluna_metrica} AS valor_indicador
+                    COUNT(DISTINCT f.id_acidente_original) AS valor_indicador
                 FROM fato_acidentes_veiculos f
                 JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
                 JOIN dim_calendario cal ON f.id_data = cal.id_data
@@ -343,7 +329,7 @@ if dados_carregados:
                   AND CAST(f.rodovia_original AS VARCHAR) != ''
                   AND CAST(f.rodovia_original AS VARCHAR) != '0'
                 GROUP BY f.rodovia_original
-                ORDER BY valor_indicador {ordenacao_sql}
+                ORDER BY valor_indicador DESC
                 LIMIT 5
             """
 
@@ -354,8 +340,8 @@ if dados_carregados:
                 with col_r1:
                     fig_rodovias = px.bar(
                         df_rodovias.sort_values("valor_indicador"), x="valor_indicador", y="rodovia", orientation="h",
-                        text="valor_indicador", color_discrete_sequence=[cor_barra],
-                        labels={"rodovia": "Rodovia Federal", "valor_indicador": label_eixo_y},
+                        text="valor_indicador", color_discrete_sequence=[PRF_BLUE],
+                        labels={"rodovia": "Rodovia Federal", "valor_indicador": "Total de Acidentes"},
                     )
                     fig_rodovias.update_traces(texttemplate="%{text:,}", textposition="outside")
                     fig_rodovias.update_layout(
@@ -370,7 +356,7 @@ if dados_carregados:
                         df_rodovias.rename(columns={
                             "rodovia": "Rodovia (BR)",
                             "estados": "Estado(s)",
-                            "valor_indicador": label_eixo_y,
+                            "valor_indicador": "Total de Acidentes",
                         }),
                         use_container_width=True, hide_index=True,
                     )
@@ -522,7 +508,9 @@ if dados_carregados:
                 except Exception as e:
                     st.error(f"⚠️ Erro ao carregar os dados das BRs: {e}")
 
-                    # -----------------------------------------------------------------
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # -----------------------------------------------------------------
             # NOVO BLOCO: Ranking e Mapa de Letalidade por Estado (UF)
             # -----------------------------------------------------------------
             st.markdown(
@@ -534,7 +522,7 @@ if dados_carregados:
                 WITH total_por_uf AS (
                     SELECT
                         loc.uf,
-                        AVG(loc.latitude) AS latitude, -- Média para centralizar o ponto no estado
+                        AVG(loc.latitude) AS latitude,
                         AVG(loc.longitude) AS longitude,
                         COUNT(CASE WHEN f.is_fatal = 1 THEN 1 END) AS acidentes_fatais,
                         COUNT(*) AS total_acidentes
@@ -561,7 +549,6 @@ if dados_carregados:
                 df_letalidade = con_query.execute(query_letalidade).df()
 
                 if not df_letalidade.empty:
-                    # Criando duas colunas de tamanhos iguais
                     col_rank, col_mapa_let = st.columns([1, 1])
 
                     with col_rank:
@@ -589,24 +576,21 @@ if dados_carregados:
                             paper_bgcolor="rgba(0,0,0,0)",
                             yaxis={"categoryorder": "total ascending"},
                             margin={"r": 40, "t": 10, "l": 0, "b": 10}, 
-                            height=380, # Altura fixa para alinhar com o mapa ao lado
+                            height=380,
                             coloraxis_showscale=False,
                         )
                         st.plotly_chart(fig_letalidade, use_container_width=True)
 
                     with col_mapa_let:
-                        # Mapa de bolhas (scatter_mapbox) onde o tamanho e a cor refletem a letalidade
                         fig_mapa_let = px.scatter_mapbox(
                             df_letalidade,
                             lat="latitude",
                             lon="longitude",
                             size="Percentual Fatal (%)",
-                            color="Percentual Fatal (%)",
-                            color_continuous_scale=[PRF_BLUE, PRF_YELLOW, PRF_RED],
-                            size_max=22,
                             zoom=3,
                             center=dict(lat=-15.78, lon=-47.93),
                             mapbox_style="carto-positron",
+                            size_max=22,
                             labels={"Percentual Fatal (%)": "Letalidade (%)", "Estado": "Estado"},
                             hover_data={
                                 "Estado": True, 
@@ -618,7 +602,7 @@ if dados_carregados:
                         )
                         
                         fig_mapa_let.update_traces(
-                            marker=dict(color=PRF_RED) # Ou "#FF0000" caso a variável PRF_RED não seja uma string de cor válida aqui
+                            marker=dict(color=PRF_RED)
                         )
                         
                         fig_mapa_let.update_layout(
@@ -633,8 +617,30 @@ if dados_carregados:
                 st.error(f"⚠️ Erro ao carregar a análise de letalidade: {e}")
 
             st.markdown("<br>", unsafe_allow_html=True)
+            
             # -----------------------------------------------------------------
+            # EXIBIÇÃO DA TAXA DE FATALIDADE BRASIL (ESCOPO SELECIONADO)
+            # -----------------------------------------------------------------
+            if not df_letalidade.empty:
+                total_fatais_br = df_letalidade["Acidentes Fatais"].sum()
+                total_acidentes_br = df_letalidade["Total de Acidentes"].sum()
+                
+                if total_acidentes_br > 0:
+                    taxa_fatalidade_br = round((total_fatais_br * 100.0) / total_acidentes_br, 2)
+                else:
+                    taxa_fatalidade_br = 0.0
 
+                st.markdown(
+                    f"""
+                    <div style="background-color: rgba(255, 0, 0, 0.05); padding: 15px; border-left: 5px solid {PRF_RED}; border-radius: 4px; margin-top: 10px;">
+                        <span style="font-weight: bold; font-size: 16px;">
+                            A taxa de fatalidade por acidente para o período selecionado no Brasil é: 
+                            <span style="color: {PRF_RED}; font-size: 18px;">{taxa_fatalidade_br}%</span>
+                        </span>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
         # =====================================================================
         # ABA 3: SAZONALIDADE TEMPORAL
         # =====================================================================
