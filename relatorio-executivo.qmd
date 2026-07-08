@@ -85,19 +85,22 @@ Por volume, Maranhão nem aparece no top 10 — a liderança é de MG, PR e SC. 
 #| fig-cap: "Letalidade: Maranhão vs. média nacional"
 df_ma = con.execute("""
     SELECT 'Maranhão' AS recorte,
-           COUNT(DISTINCT f.id_acidente_original) AS acidentes,
-           COUNT(DISTINCT CASE WHEN f.is_fatal = 1 THEN f.id_acidente_original END) AS fatais
-    FROM fato_acidentes_veiculos f JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
+           SUM(f.qtd_registros_envolvidos) AS envolvidos,
+           SUM(CASE WHEN f.is_fatal = 1 THEN f.qtd_registros_envolvidos ELSE 0 END) AS fatais
+    FROM fato_acidentes_veiculos f 
+    JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
     WHERE LOWER(loc.uf) = 'ma'
 """).df()
+
 df_br = con.execute("""
     SELECT 'Brasil (média nacional)' AS recorte,
-           COUNT(DISTINCT id_acidente_original) AS acidentes,
-           COUNT(DISTINCT CASE WHEN is_fatal = 1 THEN id_acidente_original END) AS fatais
+           SUM(qtd_registros_envolvidos) AS envolvidos,
+           SUM(CASE WHEN is_fatal = 1 THEN qtd_registros_envolvidos ELSE 0 END) AS fatais
     FROM fato_acidentes_veiculos
 """).df()
+
 df_let = pd.concat([df_ma, df_br], ignore_index=True)
-df_let["letalidade_pct"] = (df_let["fatais"] / df_let["acidentes"] * 100).round(2)
+df_let["letalidade_pct"] = (df_let["fatais"] / df_let["envolvidos"] * 100).round(2)
 
 fig_let = px.bar(
     df_let, x="recorte", y="letalidade_pct", text="letalidade_pct",
@@ -109,7 +112,7 @@ fig_let.update_layout(showlegend=False, margin=dict(l=10, r=10, t=10, b=10), hei
 fig_let.show()
 ```
 
-**Conclusão.** O Maranhão representa uma fatia pequena do volume nacional de envolvidos, mas sua letalidade é de **18,14%**, mais que o dobro da letalidade média do país (**7,19%**). Ou seja: um acidente no Maranhão tem quase 2,5x mais chance de terminar em óbito do que a média nacional. Um critério de priorização baseado apenas em volume esconderia esse risco. Recomendação: a fiscalização e os investimentos em infraestrutura no MA devem ser dimensionados pela **letalidade**, não pelo volume bruto de ocorrências — e as rodovias BR-135, BR-010, BR-316 e BR-222 (as com mais acidentes fatais no estado) são o ponto de partida natural.
+**Conclusão.** O Maranhão representa uma fatia pequena do volume nacional de envolvidos, mas sua letalidade é de 8,61%, quase o dobro da média nacional (4,75%), o que significa que um envolvido em sinistro no estado tem cerca de duas vezes mais chance de vir a óbito. Esse cenário crítico é agravado por gargalos estruturais históricos nas rodovias federais maranhenses, que incluem a escassez crônica de radares e redutores eletrônicos de velocidade, trechos extensos de pista simples com sinalização precária ou apagada, desníveis severos na pista e falhas na proteção de pedestres em perímetros urbanos, além do tempo de resposta tardio para atendimento médico de urgência devido às grandes distâncias geográficas. Recomendação: os investimentos de fiscalização e infraestrutura devem ser guiados pela letalidade, não pelo volume bruto de ocorrências, priorizando a instalação imediata de redutores de velocidade, melhorias geométricas e auditoria de sinalização nos trechos críticos das rodovias BR-135, BR-010, BR-316 e BR-222.
 
 ------------------------------------------------------------------------
 
@@ -124,7 +127,7 @@ df_perfil = con.execute("""
     SELECT
         env.tipo_envolvido AS papel,
         SUM(f.qtd_registros_envolvidos) AS total,
-        SUM(CASE WHEN f.is_fatal = 1 THEN 1 ELSE 0 END) AS fatais
+        SUM(CASE WHEN f.is_fatal = 1 THEN f.qtd_registros_envolvidos ELSE 0 END) AS fatais
     FROM fato_acidentes_veiculos f
     JOIN dim_envolvido env ON f.id_envolvido = env.id_envolvido
     WHERE env.tipo_envolvido NOT IN ('nao_informado', 'testemunha')
@@ -146,7 +149,7 @@ fig_perfil.show()
 
 *(Testemunhas foram excluídas: não são vítimas do sinistro, e sua presença na dimensão apenas registra quem prestou depoimento — um efeito colateral do dado de origem que vale registrar aqui para não distorcer a leitura de risco.)*
 
-**Conclusão.** Pedestres têm **26,3%** de chance de óbito quando envolvidos em um acidente — cerca de **5 vezes** a taxa de condutores (5,2%) e passageiros (4,7%). Isso inverte uma suposição comum de que o maior risco está dentro do veículo. Recomendação: parte do orçamento de segurança viária hoje direcionado a fiscalização de condutores traria mais retorno se realocado para infraestrutura de proteção ao pedestre (faixas elevadas, iluminação, redutores de velocidade) nos trechos urbanos das rodovias com mais acidentes fatais, como a BR-116 e a BR-101 no recorte nacional.
+**Conclusão.** Pedestres têm **26,32%** de chance de óbito quando envolvidos em um acidente — cerca de **5 vezes** a taxa de condutores (5,2%) e passageiros (4,7%). Essa vulnerabilidade extrema ocorre porque o pedestre absorve diretamente a energia do impacto mecânico, sem qualquer barreira de proteção física ou zonas de deformação estrutural, como airbags e cintos de segurança presentes nos veículos. Além disso, o risco é potencializado pela ausência crônica de passarelas, calçadas contínuas e iluminação adequada nos trechos em que rodovias federais cortam perímetros urbanos, forçando o pedestre a dividir a pista com veículos em alta velocidade, somado à sinalização precária de travessias e à falta de faixas elevadas ou redutores de velocidade. Recomendação: parte do orçamento de segurança viária hoje direcionado à fiscalização de condutores traria mais retorno se realocado para infraestrutura de proteção e canalização do fluxo de pedestres nesses pontos críticos de adensamento urbano, priorizando intervenções físicas imediatas nas rodovias com maior recorrência de atropelamentos fatais, como a BR-116 e a BR-101 no recorte nacional.
 
 ------------------------------------------------------------------------
 
