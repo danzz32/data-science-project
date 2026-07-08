@@ -245,6 +245,7 @@ if dados_carregados:
                 WHERE loc.uf IN ({str_ufs_finais}) AND cal.ano IN ({str_anos})
                 GROUP BY loc.uf
                 ORDER BY total_envolvidos DESC
+                LIMIT 10
             """
 
             query_mapa = f"""
@@ -269,7 +270,8 @@ if dados_carregados:
             df_mapa = con_query.execute(query_mapa).df()
 
             if not df_p1.empty:
-                col1, col2 = st.columns([2, 3])
+                # 🎯 Alterado de [2, 3] para [1, 1] para equilibrar o layout meio a meio na tela
+                col1, col2 = st.columns([1, 1])
 
                 with col1:
                     st.markdown('<div class="section-subtitle">Volumetria de Envolvidos por UF</div>', unsafe_allow_html=True)
@@ -281,7 +283,7 @@ if dados_carregados:
                     fig_p1.update_traces(texttemplate="%{text}%", textposition="outside")
                     fig_p1.update_layout(
                         plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                        margin={"r": 30, "t": 5, "l": 5, "b": 5}, height=380,
+                        margin={"r": 30, "t": 5, "l": 5, "b": 5}, height=400, # 🎯 Ajustado para 400px
                         xaxis_title=None, yaxis_title=None,
                     )
                     st.plotly_chart(fig_p1, use_container_width=True)
@@ -292,7 +294,7 @@ if dados_carregados:
                         fig_map = px.scatter_mapbox(
                             df_mapa, lat="latitude", lon="longitude",
                             size="numero_acidentes", color="numero_acidentes",
-                            zoom=3.2, mapbox_style="carto-positron", height=380, opacity=0.85,
+                            zoom=3.2, mapbox_style="carto-positron", height=400, opacity=0.85, # 🎯 Ajustado para 400px
                             color_continuous_scale=[PRF_BLUE, PRF_YELLOW, PRF_RED],
                             hover_name="rodovia",
                             hover_data={
@@ -336,7 +338,7 @@ if dados_carregados:
             df_rodovias = con_query.execute(query_rodovias).df()
 
             if not df_rodovias.empty:
-                col_r1, col_r2 = st.columns([3, 2])
+                col_r1, col_r2 = st.columns([1, 1]) # 🎯 Se quiser equilibrar o ranking de baixo também
                 with col_r1:
                     fig_rodovias = px.bar(
                         df_rodovias.sort_values("valor_indicador"), x="valor_indicador", y="rodovia", orientation="h",
@@ -362,7 +364,6 @@ if dados_carregados:
                     )
             else:
                 st.info("ℹ️ Não foram encontrados registros de rodovias válidas.")
-
         # =====================================================================
         # ABA 2: PERFIL DE RISCO & SEVERIDADE
         # =====================================================================
@@ -438,7 +439,8 @@ if dados_carregados:
                 unsafe_allow_html=True,
             )
 
-            col_mapa, col_tabela = st.columns([2, 1])
+            # 🎯 Alterado de [2, 1] para [1, 1] para garantir o layout meio a meio na tela
+            col_mapa, col_tabela = st.columns([1, 1])
 
             with col_mapa:
                 query_mapa_fatal = f"""
@@ -470,12 +472,12 @@ if dados_carregados:
                         center=dict(lat=-15.78, lon=-47.93),
                         zoom=3,
                         mapbox_style="carto-positron",
-                        color_continuous_scale=[PRF_BLUE, PRF_YELLOW, PRF_RED],
+                        color_continuous_scale="Reds",  # 🎯 Ajustado para a escala de tons vermelhos
                         labels={"total_acidentes": "Nº de Acidentes Fatais", "uf": "Estado"},
                         hover_data={"uf": True, "total_acidentes": True},
                     )
                     fig_mapa_fatal.update_layout(
-                        margin={"r": 0, "t": 0, "l": 0, "b": 0}, height=380, coloraxis_showscale=False,
+                        margin={"r": 0, "t": 0, "l": 0, "b": 0}, height=420, coloraxis_showscale=False, # 🎯 Altura padronizada
                     )
                     st.plotly_chart(fig_mapa_fatal, use_container_width=True)
                 else:
@@ -502,6 +504,8 @@ if dados_carregados:
                 try:
                     df_top_brs = con_query.execute(query_top_brs).df()
                     if not df_top_brs.empty:
+                        # 🎯 Adicionado um pequeno espaçamento para alinhar com o topo do mapa ao lado
+                        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
                         st.dataframe(df_top_brs, use_container_width=True, hide_index=True)
                     else:
                         st.info("ℹ️ Nenhuma ocorrência fatal registrada.")
@@ -511,7 +515,7 @@ if dados_carregados:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # -----------------------------------------------------------------
-            # NOVO BLOCO: Ranking e Mapa de Letalidade por Estado (UF)
+            # BLOCO: Ranking e Mapa de Letalidade por Estado (UF)
             # -----------------------------------------------------------------
             st.markdown(
                 '<div class="section-subtitle">📊 Letalidade por Estado: % de Acidentes Fatais</div>',
