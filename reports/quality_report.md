@@ -1,5 +1,5 @@
 # Relatório de Qualidade de Dados - Camada Trusted (DuckDB Motor)
-**Data de Execução:** 2026-07-06 09:38:01
+**Data de Execução:** 2026-07-14 21:21:26
 **Estratégia Computacional:** Arquitetura Vetorizada de Alta Performance com DuckDB
 
 ## Resumo da Execução (Linhas)

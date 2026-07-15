@@ -29,6 +29,15 @@ __pycache__/
 *.swo
 *~
 .DS_Store
+Thumbs.db
+
+# Ignora segredos locais do Streamlit (chaves/API tokens de runtime)
+.streamlit/secrets.toml
+
+# Caches de lint/type-check/test
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
 
 # ==========================================
 # 3. CAMADAS DO DATA LAKE LOCAL (Controle Estrito)
@@ -50,6 +59,11 @@ data/trusted/*.parquet
 # Ignora os arquivos binários de isolamento, mas mantém a pasta
 data/quarantine/*.parquet
 !data/quarantine/.gitkeep
+
+# --- CAMADA MART ---
+# Ignora a saída binária gerada pelo build_mart.py (regenerável a partir da camada trusted)
+data/mart/*.parquet
+!data/mart/.gitkeep
 
 # ==========================================
 # 4. NOTEBOOKS E DOCUMENTAÇÃO (Estrutura Exigida)
@@ -75,3 +89,13 @@ logs/
 *.temp
 .tmp/
 docs/.tmp
+
+/.quarto/
+**/*.quarto_ipynb
+
+
+# Arquivos temporários de editores (Vim / Neovim)
+*.un~
+*.swp
+*.swo
+.netrwhist

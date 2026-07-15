@@ -1,0 +1,168 @@
+---
+title: "Relatório Executivo — Acidentes em Rodovias Federais (PRF)"
+subtitle: "Sprint 4: Produto & Storytelling · Introdução à Ciência de Dados · PPGCA 2026.1"
+author: "Equipe [preencher nomes]"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    theme: cosmo
+    code-fold: true
+    output-dir: reports
+execute:
+  warning: false
+  message: false
+  echo: true
+---
+
+```{python}
+#| label: setup
+#| include: false
+import os
+import duckdb
+import pandas as pd
+import plotly.express as px
+import plotly.io as pio
+
+pio.templates.default = "plotly_white"
+
+# Garante que o caminho seja construído a partir da raiz do projeto, independente de onde o .qmd é executado
+PROJECT_ROOT = os.path.abspath(os.path.join(os.getcwd(), "..")) if "docs" in os.getcwd() else os.getcwd()
+MART_DIR = os.path.join(PROJECT_ROOT, "data", "mart")
+
+con = duckdb.connect(database=":memory:")
+con.execute(f"CREATE TABLE fato_acidentes_veiculos AS SELECT * FROM read_parquet('{MART_DIR}/fato_acidentes_veiculos.parquet')")
+con.execute(f"CREATE TABLE dim_localidade AS SELECT * FROM read_parquet('{MART_DIR}/dim_localidade.parquet')")
+con.execute(f"CREATE TABLE dim_envolvido AS SELECT * FROM read_parquet('{MART_DIR}/dim_envolvido.parquet')")
+con.execute(f"CREATE TABLE dim_calendario AS SELECT * FROM read_parquet('{MART_DIR}/dim_calendario.parquet')")
+
+PRF_BLUE = "#1E88E5"
+PRF_NAVY = "#0B1F3A"
+PRF_RED  = "#E53935"
+PRF_YELLOW = "#FFC400"
+```
+
+## Para quem é este relatório
+
+Este documento traduz a camada Mart construída nas Sprints 2 e 3 em **decisões**. Ele não é dirigido a quem já conhece o pipeline, mas a um gestor de segurança viária que precisa decidir onde e como alocar recursos limitados de fiscalização e infraestrutura. O dashboard interativo (`app.py`) complementa este relatório para quem quiser explorar os dados por conta própria; aqui, cada seção segue **Contexto → Dados → Conclusão**.
+
+------------------------------------------------------------------------
+
+## 🔍 Questão 1 — Onde priorizar recursos de fiscalização: volume ou letalidade?
+
+**Contexto.** A forma mais óbvia de decidir onde investir em fiscalização é olhar o volume de ocorrências por estado. Mas volume por si só favorece estados com mais malha viária e mais tráfego — não necessariamente os mais perigosos. A pergunta de negócio real é outra: **em qual estado um acidente tem mais chance de matar?**
+
+```{python}
+#| label: chart_q1_volume
+#| fig-cap: "Top 10 estados por volume de envolvidos (2021–2025)"
+df_volume = con.execute("""
+    WITH total AS (SELECT SUM(qtd_registros_envolvidos) AS t FROM fato_acidentes_veiculos)
+    SELECT UPPER(loc.uf) AS uf,
+           SUM(f.qtd_registros_envolvidos) AS envolvidos,
+           ROUND(SUM(f.qtd_registros_envolvidos) * 100.0 / (SELECT t FROM total), 2) AS share_pct
+    FROM fato_acidentes_veiculos f
+    JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
+    GROUP BY loc.uf
+    ORDER BY envolvidos DESC
+    LIMIT 10
+""").df()
+
+fig_volume = px.bar(
+    df_volume.sort_values("envolvidos"), x="envolvidos", y="uf", orientation="h",
+    text="share_pct", color_discrete_sequence=[PRF_BLUE],
+    labels={"uf": "Estado (UF)", "envolvidos": "Total de envolvidos"},
+)
+fig_volume.update_traces(texttemplate="%{text}%", textposition="outside")
+fig_volume.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=380)
+fig_volume.show()
+```
+
+Por volume, Maranhão nem aparece no top 10 — a liderança é de MG, PR e SC. Se a decisão parasse aqui, o MA sairia da lista de prioridades. Mas volume mede exposição, não risco. Cruzando o mesmo recorte por **índice de letalidade** (percentual de acidentes que resultam em óbito):
+
+```{python}
+#| label: chart_q1_letalidade
+#| fig-cap: "Letalidade: Maranhão vs. média nacional"
+df_ma = con.execute("""
+    SELECT 'Maranhão' AS recorte,
+           SUM(f.qtd_registros_envolvidos) AS envolvidos,
+           SUM(CASE WHEN f.is_fatal = 1 THEN f.qtd_registros_envolvidos ELSE 0 END) AS fatais
+    FROM fato_acidentes_veiculos f 
+    JOIN dim_localidade loc ON f.id_localidade = loc.id_localidade
+    WHERE LOWER(loc.uf) = 'ma'
+""").df()
+
+df_br = con.execute("""
+    SELECT 'Brasil (média nacional)' AS recorte,
+           SUM(qtd_registros_envolvidos) AS envolvidos,
+           SUM(CASE WHEN is_fatal = 1 THEN qtd_registros_envolvidos ELSE 0 END) AS fatais
+    FROM fato_acidentes_veiculos
+""").df()
+
+df_let = pd.concat([df_ma, df_br], ignore_index=True)
+df_let["letalidade_pct"] = (df_let["fatais"] / df_let["envolvidos"] * 100).round(2)
+
+fig_let = px.bar(
+    df_let, x="recorte", y="letalidade_pct", text="letalidade_pct",
+    color="recorte", color_discrete_map={"Maranhão": PRF_RED, "Brasil (média nacional)": PRF_NAVY},
+    labels={"recorte": "", "letalidade_pct": "Letalidade (%)"},
+)
+fig_let.update_traces(texttemplate="%{text}%", textposition="outside")
+fig_let.update_layout(showlegend=False, margin=dict(l=10, r=10, t=10, b=10), height=320)
+fig_let.show()
+```
+
+**Conclusão.** O Maranhão representa uma fatia pequena do volume nacional de envolvidos, mas sua letalidade é de 8,61%, quase o dobro da média nacional (4,75%), o que significa que um envolvido em sinistro no estado tem cerca de duas vezes mais chance de vir a óbito. Esse cenário crítico é agravado por gargalos estruturais históricos nas rodovias federais maranhenses, que incluem a escassez crônica de radares e redutores eletrônicos de velocidade, trechos extensos de pista simples com sinalização precária ou apagada, desníveis severos na pista e falhas na proteção de pedestres em perímetros urbanos, além do tempo de resposta tardio para atendimento médico de urgência devido às grandes distâncias geográficas. Recomendação: os investimentos de fiscalização e infraestrutura devem ser guiados pela letalidade, não pelo volume bruto de ocorrências, priorizando a instalação imediata de redutores de velocidade, melhorias geométricas e auditoria de sinalização nos trechos críticos das rodovias BR-135, BR-010, BR-316 e BR-222.
+
+------------------------------------------------------------------------
+
+## 🔍 Questão 2 — Qual perfil de envolvido concentra o maior risco de morte?
+
+**Contexto.** Nem todo envolvido em um acidente corre o mesmo risco. Saber *quem* está morrendo — condutor, passageiro ou pedestre — muda completamente o tipo de intervenção que se recomenda: regulação de trânsito é diferente de infraestrutura de calçada.
+
+```{python}
+#| label: chart_q2_perfil
+#| fig-cap: "Percentual de fatalidade por papel do envolvido"
+df_perfil = con.execute("""
+    SELECT
+        env.tipo_envolvido AS papel,
+        SUM(f.qtd_registros_envolvidos) AS total,
+        SUM(CASE WHEN f.is_fatal = 1 THEN f.qtd_registros_envolvidos ELSE 0 END) AS fatais
+    FROM fato_acidentes_veiculos f
+    JOIN dim_envolvido env ON f.id_envolvido = env.id_envolvido
+    WHERE env.tipo_envolvido NOT IN ('nao_informado', 'testemunha')
+    GROUP BY papel
+""").df()
+df_perfil["pct_fatal"] = (df_perfil["fatais"] / df_perfil["total"] * 100).round(2)
+df_perfil["papel"] = df_perfil["papel"].str.capitalize()
+df_perfil = df_perfil.sort_values("pct_fatal")
+
+fig_perfil = px.bar(
+    df_perfil, x="pct_fatal", y="papel", orientation="h", text="pct_fatal",
+    color="pct_fatal", color_continuous_scale=[PRF_BLUE, PRF_YELLOW, PRF_RED],
+    labels={"papel": "", "pct_fatal": "Fatalidade (%)"},
+)
+fig_perfil.update_traces(texttemplate="%{text}%", textposition="outside")
+fig_perfil.update_layout(coloraxis_showscale=False, margin=dict(l=10, r=40, t=10, b=10), height=320)
+fig_perfil.show()
+```
+
+*(Testemunhas foram excluídas: não são vítimas do sinistro, e sua presença na dimensão apenas registra quem prestou depoimento — um efeito colateral do dado de origem que vale registrar aqui para não distorcer a leitura de risco.)*
+
+**Conclusão.** Pedestres têm **26,32%** de chance de óbito quando envolvidos em um acidente — cerca de **5 vezes** a taxa de condutores (5,2%) e passageiros (4,7%). Essa vulnerabilidade extrema ocorre porque o pedestre absorve diretamente a energia do impacto mecânico, sem qualquer barreira de proteção física ou zonas de deformação estrutural, como airbags e cintos de segurança presentes nos veículos. Além disso, o risco é potencializado pela ausência crônica de passarelas, calçadas contínuas e iluminação adequada nos trechos em que rodovias federais cortam perímetros urbanos, forçando o pedestre a dividir a pista com veículos em alta velocidade, somado à sinalização precária de travessias e à falta de faixas elevadas ou redutores de velocidade. Recomendação: parte do orçamento de segurança viária hoje direcionado à fiscalização de condutores traria mais retorno se realocado para infraestrutura de proteção e canalização do fluxo de pedestres nesses pontos críticos de adensamento urbano, priorizando intervenções físicas imediatas nas rodovias com maior recorrência de atropelamentos fatais, como a BR-116 e a BR-101 no recorte nacional.
+
+------------------------------------------------------------------------
+
+## ⚠️ Nota metodológica sobre sazonalidade
+
+O app e o notebook da Sprint 3 exploraram também a evolução mensal de ocorrências. Optamos por **não** transformar essa exploração em uma terceira pergunta executiva aqui: a chave de data da camada Mart (`id_data_fato`) é gerada de forma sequencial/cíclica, não a partir da data real do acidente na fonte (ver limitação documentada no `README.md`). Qualquer padrão sazonal "descoberto" nesse recorte seria artefato da engenharia de dados, não um sinal real — e um relatório executivo perde credibilidade se apresenta como decisão algo que é, na verdade, uma limitação de dado. Tratamos esse ponto com mais detalhe no relatório de reflexão da Sprint 4 (PDF).
+
+------------------------------------------------------------------------
+
+## Resumo para decisão
+
+| Achado | Implicação |
+|---|---|
+| Letalidade no MA (18,14%) é > 2x a média nacional (7,19%), apesar do baixo volume | Priorizar por letalidade, não por volume bruto |
+| Pedestres têm ~5x mais risco de óbito que condutores (26,3% vs. 5,2%) | Redirecionar parte do investimento para infraestrutura de proteção ao pedestre |
+| Sazonalidade mensal não é confiável na Mart atual (data sintética) | Não usar o eixo temporal do app para decisões operacionais até correção do pipeline |
