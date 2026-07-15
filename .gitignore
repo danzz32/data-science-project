@@ -3,9 +3,14 @@
 # =====================================================================
 __pycache__/
 *.py[oc]
+*.egg-info/
 .venv/
 .uv/
 .vulture_ignore
+.Python
+dist/
+build/
+wheels/
 
 # ==========================================
 # 2. GOVERNANÇA E SEGURANÇA (Regra de Desclassificação)
@@ -14,88 +19,90 @@ __pycache__/
 .env
 .env.*
 *.env
-
-# Permite explicitamente o arquivo de exemplo exigido no seu README
 !.env.example
+
+# Credenciais Kaggle / cloud (nunca versionar)
+kaggle.json
+**/kaggle.json
+.kaggle/
+credentials.json
+**/credentials.json
+*.pem
+*.p12
+*.key
 
 # Ignora configurações locais de IDE (preferências pessoais, credenciais)
 .vscode/settings.json
 .vscode/launch.json
 .vscode/*.json
-
-# Ignora arquivos de configuração local de editors
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
 Thumbs.db
+.cursor/
 
 # Ignora segredos locais do Streamlit (chaves/API tokens de runtime)
 .streamlit/secrets.toml
 
-# Caches de lint/type-check/test
+# Caches de lint/type-check/test/cobertura
 .ruff_cache/
 .mypy_cache/
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.Hypothesis/
 
 # ==========================================
 # 3. CAMADAS DO DATA LAKE LOCAL (Controle Estrito)
 # ==========================================
+# Qualquer artefato de dados nas camadas (regeneráveis pelo pipeline)
+data/**/*.csv
+data/**/*.zip
+data/**/*.json
+data/**/*.txt
+data/**/*.parquet
+data/**/*.duckdb
+data/**/*.wal
+data/raw/temp_extraction/
 
-# --- CAMADA RAW ---
-data/raw/*.csv
-data/raw/*.zip
-data/raw/*.json
-data/raw/*.txt
-!data/raw/.gitkeep
-
-# --- CAMADA TRUSTED ---
-# Ignora a saída binária de dados gerada pelo transform.py
-data/trusted/*.parquet
-!data/trusted/.gitkeep
-
-# --- CAMADA QUARANTINE ---
-# Ignora os arquivos binários de isolamento, mas mantém a pasta
-data/quarantine/*.parquet
-!data/quarantine/.gitkeep
-
-# --- CAMADA MART ---
-# Ignora a saída binária gerada pelo build_mart.py (regenerável a partir da camada trusted)
-data/mart/*.parquet
-!data/mart/.gitkeep
+# Mantém apenas a estrutura de pastas versionada
+!data/**/.gitkeep
 
 # ==========================================
 # 4. NOTEBOOKS E DOCUMENTAÇÃO (Estrutura Exigida)
 # ==========================================
-# Garante que o notebook eda_qualidade.qmd e scripts não sejam ignorados
 !docs/
 !docs/*.qmd
 !docs/*.ipynb
+!docs/*.md
 
-# Ignora caches locais do Quarto/Jupyter se você renderizar os relatórios
+# Ignora caches locais do Quarto/Jupyter e temp do DuckDB
 .markdown-notebook/
 .ipynb_checkpoints/
+docs/.tmp/
+docs/.tmp/**
 
 # ==========================================
 # 5. ARTEFATOS DE BUILD E EXECUÇÃO
 # ==========================================
-# Logs de execução
 *.log
 logs/
 
-# Arquivos temporários
 *.tmp
 *.temp
 .tmp/
-docs/.tmp
+*.bak
+*.orig
 
 /.quarto/
 **/*.quarto_ipynb
-
+**/_freeze/
 
 # Arquivos temporários de editores (Vim / Neovim)
 *.un~
-*.swp
-*.swo
 .netrwhist
